@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 280" width="1100" height="280"><style>@import url('https://fonts.googleapis.com/css2?family=Rozha+One&amp;family=Hind+Vadodara:wght@500;700&amp;display=swap');</style>
+    <g transform="translate(10 10) scale(0.5078125)">
+  <circle cx="256" cy="256" r="184" fill="#E2A62B" />
+  <circle cx="256" cy="256" r="166" fill="none" stroke="#8A3214" stroke-width="7" stroke-linecap="round" stroke-dasharray="0.1 21.6"/>
+  <circle cx="256" cy="256" r="150" fill="#FBF6EE" />
+  <circle cx="172" cy="208" r="38" fill="#E2A62B" />
+    <circle cx="172" cy="208" r="27" fill="#D97706"/><circle cx="256" cy="160" r="38" fill="#E2A62B" />
+    <circle cx="256" cy="160" r="27" fill="#1F5F4A"/><circle cx="340" cy="208" r="38" fill="#E2A62B" />
+    <circle cx="340" cy="208" r="27" fill="#F3D27A"/>
+  <circle cx="200" cy="318" r="50" fill="#E9C994" stroke="#D4AA6A" stroke-width="3"/>
+  <circle cx="186" cy="305" r="6" fill="#B98545"/><circle cx="214" cy="330" r="5" fill="#B98545"/><circle cx="208" cy="300" r="4" fill="#B98545"/>
+  <path d="M262 352 q50 -82 100 0 z" fill="#fff" stroke="#E6D8BE" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M256 236 c-14 14 -14 30 0 38 c14 -8 14 -24 0 -38z" fill="#B4441B"/></g>
+    <text x="300" y="118" font-family="Rozha One, Georgia, serif" font-size="84" fill="#2B1D14">Shree Ram Bharose</text>
+    <text x="304" y="186" font-family="Hind Vadodara, sans-serif" font-weight="700" font-size="40" letter-spacing="10" fill="#1F5F4A">HINDU HOTEL</text>
+    <text x="304" y="240" font-family="Hind Vadodara, sans-serif" font-weight="700" font-size="34" fill="#B4441B">શ્રી રામ ભરોસે હિન્દુ હોટલ</text></svg>

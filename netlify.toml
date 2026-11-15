@@ -1,0 +1,57 @@
+# Temporary hosting on Netlify (production target is Firebase — see docs/DEPLOY.md).
+# Frontend: web/dist. API: netlify/functions/api.mjs (same Express app as Firebase), database: Firestore.
+
+[build]
+  command = "npm run install:all && npm run build"
+  publish = "web/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Slower refresh than on Firebase, to stay inside Netlify's function-call quota (see docs/DEPLOY.md)
+  VITE_POLL_TABLES_MS = "60000"
+  VITE_POLL_STATION_MS = "15000"
+  VITE_HEARTBEAT_MS = "60000"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "nft"
+  # firebase-admin & friends are resolved from functions/node_modules
+  included_files = ["functions/lib/**"]
+
+# API → function (status 200 = proxy/rewrite: same origin, cookies work)
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+# SPA fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "same-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

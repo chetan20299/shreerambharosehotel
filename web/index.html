@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Shree Ram Bharose Hindu Hotel</title>
+    <meta name="description" content="Billing, tables and reports for Shree Ram Bharose Hindu Hotel" />
+    <meta name="theme-color" content="#B4441B" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Vadodara:wght@400;500;600;700&family=Hind:wght@400;500;600;700&family=Rozha+One&display=swap" />
+    <style>
+      /* Startup splash: shown before JS loads, removed by React on mount. */
+      #splash { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 16px; background: #FBF6EE; font-family: Georgia, serif; color: #2B1D14; z-index: 100; }
+      #splash img { width: 120px; height: 120px; animation: splash-pulse 1.4s ease-in-out infinite; }
+      #splash .name { font-size: 22px; }
+      #splash .bar { width: 120px; height: 4px; border-radius: 2px; background: #EADFCB; overflow: hidden; }
+      #splash .bar::after { content: ''; display: block; width: 40%; height: 100%; background: #B4441B; animation: splash-bar 1s ease-in-out infinite; }
+      @keyframes splash-pulse { 50% { transform: scale(1.06); } }
+      @keyframes splash-bar { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+    </style>
+  </head>
+  <body>
+    <div id="splash"><img src="/brand/logo-icon.svg" alt="" /><div class="name">Shree Ram Bharose</div><div class="bar"></div></div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

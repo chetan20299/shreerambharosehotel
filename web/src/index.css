@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* Design system — Shree Ram Bharose Hindu Hotel */
+@theme {
+  --color-primary: #B4441B;       /* Kesar / saffron-terracotta */
+  --color-primary-dark: #8A3214;
+  --color-primary-soft: #F6E3D8;
+  --color-secondary: #1F5F4A;     /* Banana leaf green */
+  --color-secondary-soft: #DCEBE4;
+  --color-accent: #E2A62B;        /* Marigold / brass */
+  --color-accent-soft: #FBEFD3;
+  --color-bg: #FBF6EE;            /* Cream */
+  --color-card: #FFFFFF;
+  --color-line: #EADFCB;
+  --color-success: #2E7D4F;
+  --color-warning: #D98E04;
+  --color-error: #C62828;
+  --color-ink: #2B1D14;           /* Primary text */
+  --color-muted: #6B5A4E;         /* Secondary text */
+
+  /* Hind Vadodara = Latin + Gujarati, Hind = Devanagari (same design family, same metrics). Noto as device fallback. */
+  --font-sans: "Hind Vadodara", "Hind", "Noto Sans Gujarati", "Noto Sans Devanagari", system-ui, sans-serif;
+  --font-display: "Rozha One", Georgia, serif;
+}
+
+/* Fluid type scale: every rem-based size (text, spacing, buttons, logo) grows smoothly from small phones (15px)
+   to tablets/desktops (17px). Respects the user's browser font-size setting because it's relative to rem. */
+/* ≈13px at 320px wide, ≈14px at 360–412px phones, max 16.5px on tablets/desktops. */
+html { font-size: clamp(13px, 0.6rem + 1.1vw, 16.5px); -webkit-text-size-adjust: 100%; }
+/* Small phones: tighter page and card spacing so content isn't squeezed. */
+@media (max-width: 380px) {
+  main { padding-left: 0.625rem !important; padding-right: 0.625rem !important; }
+  .card.p-4, .card.p-5 { padding: 0.75rem; }
+  h1 { font-size: 1.35rem !important; }
+}
+html, body { background: var(--color-bg); color: var(--color-ink); -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 55%, transparent); outline-offset: 2px; border-radius: 0.75rem; }
+@keyframes progress-slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes slide-in { from { transform: translateX(-100%); } to { transform: none; } }
+/* Indic scripts have tall matras/conjuncts: generous line-height, never clip, always allow wrapping. */
+body { font-family: var(--font-sans); overscroll-behavior-y: none; line-height: 1.55; overflow-wrap: anywhere; }
+:lang(gu), :lang(hi) { line-height: 1.7; }
+:lang(gu) button, :lang(hi) button, :lang(gu) .chip, :lang(hi) .chip { line-height: 1.45; }
+h1, h2, h3 { line-height: 1.35; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+
+/* Component classes as Tailwind v4 utilities (so variants and !overrides work on them). */
+@utility card { @apply rounded-2xl bg-card border border-line shadow-[0_1px_2px_rgba(43,29,20,.06)]; }
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 min-h-[max(3rem,44px)] min-w-[max(3rem,44px)] font-semibold text-base leading-snug text-center transition active:scale-[.98] select-none disabled:active:scale-100; }
+@utility btn-primary { @apply btn bg-primary text-white hover:bg-primary-dark; }
+@utility btn-secondary { @apply btn bg-secondary text-white hover:brightness-110; }
+@utility btn-ghost { @apply btn bg-transparent text-ink border border-line hover:bg-primary-soft; }
+@utility btn-danger { @apply btn bg-error text-white hover:brightness-110; }
+@utility input { @apply w-full rounded-xl border border-line bg-white px-3 min-h-[max(3rem,44px)] text-base text-ink placeholder:text-muted/70 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-bg disabled:text-muted; }
+@utility label { @apply block text-sm font-semibold text-muted mb-1; }
+@utility chip { @apply inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold; }
+@utility th { @apply text-left text-xs font-bold uppercase tracking-wide text-muted px-3 py-2 bg-bg; }
+@utility td { @apply px-3 py-2 border-t border-line; }
+
+/* Letter-spacing breaks Gujarati/Devanagari conjuncts & matras: always 0 for Indic UI text. */
+:lang(gu) *, :lang(hi) * { letter-spacing: 0 !important; }
+
+/* Branded loader: thali rim rotates, flame flickers */
+@keyframes rim-spin { to { transform: rotate(360deg); } }
+@keyframes flame { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15, .9); opacity: .8; } }
+.loader-rim { transform-origin: 256px 256px; animation: rim-spin 2.4s linear infinite; }
+.loader-flame { transform-origin: 256px 260px; animation: flame .7s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .loader-rim, .loader-flame { animation: none; } }
+
+/* Printing: only the receipt is printed (Android print / Save as PDF fallback). */
+@media print {
+  body * { visibility: hidden; }
+  #print-area, #print-area * { visibility: visible; }
+  #print-area { position: absolute; inset: 0 auto auto 0; width: 100%; }
+  @page { margin: 4mm; }
+}

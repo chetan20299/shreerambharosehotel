@@ -1,0 +1,11 @@
+rules_version = '2';
+// This app uses custom session cookies, which Security Rules cannot see.
+// ALL reads/writes go through the `api` Cloud Function (Admin SDK bypasses rules).
+// Direct client access is therefore denied completely.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

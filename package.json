@@ -1,0 +1,21 @@
+{
+  "name": "shree-ram-bharose-hindu-hotel",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Hotel management PWA for Shree Ram Bharose Hindu Hotel (React + Firebase, custom auth)",
+  "scripts": {
+    "install:all": "npm i && npm --prefix functions i && npm --prefix web i",
+    "build": "npm --prefix functions run build && npm --prefix web run build",
+    "demo": "npm run build && firebase emulators:start --project demo-srbh --inspect-functions",
+    "test:unit": "npm --prefix functions test && npm --prefix web test",
+    "test:emulators": "npm --prefix functions run build && firebase emulators:exec --project demo-srbh --only firestore,storage \"npm --prefix functions run test:integration\"",
+    "test:e2e": "npm run build && firebase emulators:exec --project demo-srbh --inspect-functions \"npm --prefix web run e2e\"",
+    "deploy": "npm run build && firebase deploy"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.36.0"
+  },
+  "dependencies": {
+    "serverless-http": "^4.0.0"
+  }
+}

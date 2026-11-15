@@ -1,0 +1,23 @@
+node_modules/
+functions/lib/
+web/dist/
+web/dev-dist/
+web/test-results/
+docs/e2e-report/
+*.log
+docs/*-last.txt
+.npmrc
+web/.npmrc
+functions/.npmrc
+.firebase/
+# Secrets / local-only config
+functions/.secret.local
+functions/.env.local
+functions/.env.*.local
+.env
+.remember/
+
+# Netlify local state + never commit service-account keys
+.netlify/
+*service-account*.json
+*serviceAccount*.json
