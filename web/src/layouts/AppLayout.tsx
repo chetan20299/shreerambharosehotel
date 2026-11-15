@@ -73,7 +73,7 @@ function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         <span className="hidden sm:block text-sm font-semibold max-w-[9rem] truncate">{user?.displayName}</span>
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(20rem,calc(100vw-2rem))] card p-4 shadow-xl">
+        <div role="menu" className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(20rem,calc(100vw-2rem))] max-h-[calc(100dvh-5rem)] overflow-y-auto card p-4 shadow-xl">
           <div className="flex items-center gap-3">
             <Avatar user={user} size="h-12 w-12 text-base" />
             <div className="min-w-0">
@@ -82,6 +82,7 @@ function ProfileMenu({ onLogout }: { onLogout: () => void }) {
               <div className="text-sm text-muted truncate">@{user?.username} · <span className="chip !py-0 !px-2 text-xs bg-secondary-soft text-secondary">{user?.role === 'admin' ? t('users.admin') : t('users.waiter')}</span></div>
             </div>
           </div>
+          <div className="mt-4" data-testid="profile-printer"><div className="label">{t('printer.title')}</div><PrinterStatus variant="card" /></div>
           <div className="mt-4"><div className="label">{t('lang.label')}</div><LanguagePicker /></div>
           <Link to="/settings" className="btn-ghost w-full mt-3" role="menuitem">⚙️ {t('profile.account')}</Link>
           <button className="btn-ghost w-full mt-2 text-error" onClick={onLogout} role="menuitem" data-testid="logout">🚪 {t('nav.logout')}</button>
@@ -252,6 +253,7 @@ export function AppLayout() {
             </div>
             <nav className="flex flex-col gap-1 overflow-y-auto">{items.map((n) => navLink(n, false))}</nav>
             <div className="mt-auto pt-3 border-t border-line space-y-2">
+              <div data-testid="drawer-printer"><PrinterStatus variant="card" /></div>
               <LanguagePicker />
               <button className="btn-ghost w-full text-error" onClick={doLogout}><Icon name="logout" className="h-5 w-5" /> {t('nav.logout')}</button>
             </div>
