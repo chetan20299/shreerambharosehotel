@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 process.env.BOOTSTRAP_TOKEN = 'netlify-smoke-bootstrap-token-123456';
 process.env.BACKUP_TARGET = 'firestore';
 process.env.CACHE_TTL_MS = '10000';
+process.env.DEMO_MODE = 'true';
 await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${process.env.GCLOUD_PROJECT}/databases/(default)/documents`, { method: 'DELETE' });
 
 const { handler, normalizePath } = await import('./functions/api.mjs');
@@ -48,5 +49,12 @@ const name = r.json[0].name;
 r = await call('GET', `/api/backups/${name}`, { cookie });
 assert.equal(r.status, 200); assert.equal(r.json.transactions.length, 1); assert.equal(r.json.transactions[0].totalAmount, 260);
 
+// Preview mode: demo logins are created on first visit and work with username + password
+r = await call('GET', '/api/demo/status');
+assert.equal(r.status, 200); assert.deepEqual(r.json.logins.map((l) => l.username), ['admin', 'ramesh', 'suresh']);
+for (const [u, p, role] of [['admin', 'Admin@123', 'admin'], ['ramesh', 'Waiter@123', 'waiter']]) {
+  r = await call('POST', '/api/auth/login', { body: { username: u, password: p } });
+  assert.equal(r.status, 200, `${u}: ${JSON.stringify(r.json)}`); assert.equal(r.json.user.role, role);
+}
 console.log('NETLIFY SMOKE TEST PASSED');
 process.exit(0);

@@ -13,7 +13,9 @@ export const monthlyRetention = onSchedule(
 const BOOTSTRAP_TOKEN = defineSecret('BOOTSTRAP_TOKEN');
 
 // Demo login requires BOTH the env flag and a demo-* project id, so it can never be on in production.
-const demoMode = process.env.DEMO_MODE === 'true' && (process.env.GCLOUD_PROJECT ?? '').startsWith('demo-');
+// (or DEMO_ALLOW_REAL_PROJECT=true for a deliberate public preview — known passwords, turn off before real use).
+const demoMode = process.env.DEMO_MODE === 'true' &&
+  ((process.env.GCLOUD_PROJECT ?? '').startsWith('demo-') || process.env.DEMO_ALLOW_REAL_PROJECT === 'true');
 
 export const api = onRequest(
   // maxInstances 1: plenty for 3 users, keeps costs inside the free tier, and keeps the in-memory cache coherent.

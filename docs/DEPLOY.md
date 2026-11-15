@@ -53,6 +53,27 @@ curl.exe -X POST https://<your-site>.netlify.app/api/bootstrap -H "Content-Type:
 This creates the admin plus the starting menu, halls and tables. Then log in as `owner`, set the real prices, and
 add your waiters.
 
+### Optional: preview logins (demo mode)
+To let people try the app straight away, add the Netlify variable **`DEMO_MODE` = `true`** and redeploy. The login
+page then shows **Demo as Admin** and **Demo as Waiter** buttons, and these logins work with the normal
+username + password form:
+
+| Username | Password | Role |
+|---|---|---|
+| `admin` | `Admin@123` | Admin |
+| `ramesh` | `Waiter@123` | Waiter |
+| `suresh` | `Waiter@123` | Waiter |
+
+It also adds a sample menu, halls, tables and about 2 months of orders.
+
+> ⚠️ **Anyone who opens the site can then log in as admin.** Before real use:
+> 1. Delete the `DEMO_MODE` variable and redeploy (the buttons disappear).
+> 2. Create your real admin with the bootstrap command (step 3), or log in as `admin` and change its password.
+> 3. In **Users**, **disable** `admin`, `ramesh` and `suresh` (or change their passwords). The accounts stay in the
+>    database until you do this.
+> 4. Optionally, delete the sample orders: **Settings → Data management → Delete records older than 30 days**, or
+>    delete by date.
+
 ### 4. Check it
 - Log in on a phone in Chrome, take an order, print or share the bill, and open the dashboard.
 - Bluetooth printing needs HTTPS, and Netlify gives you that automatically.

@@ -18,9 +18,13 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [forgot, setForgot] = useState(false);
   const [demoOn, setDemoOn] = useState(false);
+  const [demoLogins, setDemoLogins] = useState<{ username: string; password: string; role: string }[]>([]);
 
   // Demo buttons appear only when the backend is running in demo mode (local emulator project).
-  useEffect(() => { api<{ demo: boolean }>('/demo/status').then((r) => setDemoOn(r.demo)).catch(() => setDemoOn(false)); }, []);
+  useEffect(() => {
+    api<{ demo: boolean; logins?: { username: string; password: string; role: string }[] }>('/demo/status', { silent: true })
+      .then((r) => { setDemoOn(r.demo); setDemoLogins(r.logins ?? []); }).catch(() => setDemoOn(false));
+  }, []);
 
   if (loading) return <Loader full label={t('loader.startup')} />;
   if (user) return <Navigate to="/" replace />;
@@ -65,6 +69,17 @@ export function LoginPage() {
           <div className="card p-4 mt-4 border-dashed border-accent bg-accent-soft/60">
             <div className="font-bold">🧪 {t('login.demoTitle')}</div>
             <p className="text-sm text-muted mb-3">{t('login.demoNote')}</p>
+            {demoLogins.length > 0 && (
+              <table className="w-full text-sm mb-3 bg-white rounded-xl overflow-hidden" lang="en" data-testid="demo-logins">
+                <tbody>{demoLogins.map((l) => (
+                  <tr key={l.username} className="border-b border-line last:border-0">
+                    <td className="px-3 py-1.5 font-semibold">{l.role === 'admin' ? t('users.admin') : t('users.waiter')}</td>
+                    <td className="px-3 py-1.5 font-mono">{l.username}</td>
+                    <td className="px-3 py-1.5 font-mono">{l.password}</td>
+                    <td className="px-1 py-1"><button type="button" className="btn-ghost !min-h-9 !py-1 !px-2 text-xs" onClick={() => { setUsername(l.username); setPassword(l.password); }}>↑</button></td>
+                  </tr>))}</tbody>
+              </table>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <button className="btn-secondary" disabled={busy} onClick={() => run(() => demo('admin'))}>{t('login.demoAdmin')}</button>
               <button className="btn-ghost bg-white" disabled={busy} onClick={() => run(() => demo('waiter'))}>{t('login.demoWaiter')}</button>

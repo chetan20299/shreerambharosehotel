@@ -338,7 +338,10 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
 
   // Demo login: only exists when DEMO_MODE=true on a demo-* emulator project. Never in production.
   if (opts.demoMode) {
-    r.get('/demo/status', (_req, res) => { res.json({ demo: true }); });
+    r.get('/demo/status', async (_req, res) => {
+      await seedDemo(); // creates demo users + sample data once, so the listed logins work right away
+      res.json({ demo: true, logins: DEMO_USERS.map(({ username, password, role }) => ({ username, password, role })) });
+    });
     r.post('/demo/login', async (req, res) => {
       const { as } = parse(z.object({ as: role }), req.body);
       await seedDemo();
