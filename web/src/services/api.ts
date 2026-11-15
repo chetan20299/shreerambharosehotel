@@ -36,7 +36,21 @@ async function once(url: string, init: RequestInit) {
   } finally { clearTimeout(timer); }
 }
 
+/** True while the in-browser demo is active (set by the Demo buttons). */
+const demoActive = () => { try { return !!localStorage.getItem('srbh.demo'); } catch { return false; } };
+
 export async function api<T = unknown>(path: string, opts: { method?: string; body?: unknown; query?: Query; silent?: boolean } = {}): Promise<T> {
+  if (demoActive()) { // in-browser sample backend: never touches the real server or database
+    if (!opts.silent) bump(1);
+    try {
+      const { handle } = await import('../demo/mockServer');
+      const q = Object.fromEntries(Object.entries(opts.query ?? {}).filter((e): e is [string, string] => !!e[1]));
+      return (await handle(opts.method ?? 'GET', path, q, (opts.body ?? {}) as Record<string, unknown>)) as T;
+    } catch (e) {
+      const err = e as { status?: number; message?: string };
+      throw new ApiError(err.status ?? 500, err.message ?? 'Demo error');
+    } finally { if (!opts.silent) bump(-1); }
+  }
   const qs = opts.query ? new URLSearchParams(Object.entries(opts.query).filter((e): e is [string, string] => !!e[1])).toString() : '';
   const method = opts.method ?? 'GET';
   const init: RequestInit = {

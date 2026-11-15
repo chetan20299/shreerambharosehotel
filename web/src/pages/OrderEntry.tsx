@@ -8,7 +8,7 @@ import { addPending, toOrderBody } from '../services/offlineQueue';
 import { Loader } from '../components/Brand';
 import { Field, Modal, Spinner, useUi } from '../components/ui';
 import { inr, uuid } from '../utils/format';
-import { priceFor, type MenuData, type MenuItem, type Order, type PriceCategory, type Section, type Table } from '../types';
+import { priceFor, type MenuData, type MenuItem, type Order, type PriceCategory } from '../types';
 
 export interface Line { key: string; menuItemId: string; name: string; type: 'fixed' | 'custom'; isThali: boolean; quantity: number; unitPrice: number; description?: string }
 
@@ -21,39 +21,27 @@ export function validExtra(v: string) {
 }
 
 export function OrderEntryPage() {
-  const { tableId = '' } = useParams();
+  const params = useParams();
+  // The waiter picked the hall on the New order screen: it decides the price list (server applies the same rule).
+  const hall: PriceCategory = params.hall === 'ac' ? 'ac' : 'nonac';
   const { user } = useAuth();
   const { t } = useI18n();
   const { toast, confirm, errorText } = useUi();
   const nav = useNavigate();
   const menu = useApi<MenuData>('/menu', undefined, { cache: true });
-  const tables = useApi<{ sections: Section[]; tables: Table[] }>('/tables', undefined, { cache: true });
-  const table = tables.data?.tables.find((x) => x.id === tableId);
-  // AC / Non-AC price list comes from the table's section (server applies the same rule).
-  const hall: PriceCategory = tables.data?.sections.find((s) => s.id === table?.sectionId)?.priceCategory ?? 'nonac';
+  const hallName = t(`hall.${hall}`);
   const [catId, setCatId] = useState('');
   const [q, setQ] = useState('');
-  const draftKey = `srbh.draft.${tableId}`;
+  const draftKey = `srbh.draft.${hall}`;
   const [lines, setLines] = useState<Line[]>(() => { try { return JSON.parse(sessionStorage.getItem(draftKey) ?? '[]'); } catch { return []; } });
   const [extra, setExtra] = useState<{ itemId: string; amount: string; note: string } | null>(null);
   const [review, setReview] = useState(false);
   const [saving, setSaving] = useState(false);
   const idem = useRef(sessionStorage.getItem(`${draftKey}.key`) ?? uuid());
-  const claimed = useRef(false);
-  const done = useRef(false);
+
 
   useEffect(() => { sessionStorage.setItem(draftKey, JSON.stringify(lines)); sessionStorage.setItem(`${draftKey}.key`, idem.current); }, [lines, draftKey]);
 
-  // Lock the table while ordering so two waiters can't take the same table at once (skipped when offline).
-  useEffect(() => {
-    api(`/tables/${tableId}/claim`, { method: 'POST' })
-      .then(() => { claimed.current = true; })
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 0) return; // offline: allowed, server resolves on sync
-        toast(errorText(e), 'error'); nav('/tables', { replace: true });
-      });
-    return () => { if (claimed.current && !done.current) void api(`/tables/${tableId}/release`, { method: 'POST' }).catch(() => undefined); };
-  }, [tableId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Only enabled categories and active items (server already filters this for waiters).
   const cats = useMemo(() => (menu.data?.categories ?? []).filter((c) => c.active), [menu.data]);
@@ -84,19 +72,18 @@ export function OrderEntryPage() {
   };
 
   const finish = (path: string) => {
-    done.current = true;
     sessionStorage.removeItem(draftKey); sessionStorage.removeItem(`${draftKey}.key`);
     nav(path, { replace: true });
   };
   const submit = async () => {
     setSaving(true);
     try {
-      const r = await api<{ order: Order }>('/orders', { method: 'POST', body: toOrderBody({ idempotencyKey: idem.current, tableId, items: lines }) });
+      const r = await api<{ order: Order }>('/orders', { method: 'POST', body: toOrderBody({ idempotencyKey: idem.current, hall, items: lines }) });
       toast(t('order.saved', { bill: r.order.billNo }), 'success');
       finish(`/orders/${r.order.id}`);
     } catch (e) {
       if (e instanceof ApiError && e.status === 0) {
-        addPending({ idempotencyKey: idem.current, waiterId: user!.id, waiterName: user!.displayName, tableId, tableLabel: table?.label ?? tableId, createdAt: new Date().toISOString(), items: lines, total });
+        addPending({ idempotencyKey: idem.current, waiterId: user!.id, waiterName: user!.displayName, hall, tableId: '', tableLabel: hallName, createdAt: new Date().toISOString(), items: lines, total });
         toast(t('order.savedOffline'), 'info');
         finish('/orders');
       } else { toast(errorText(e), 'error'); setReview(false); }
@@ -105,7 +92,7 @@ export function OrderEntryPage() {
   const leave = async () => {
     if (lines.length && !(await confirm({ title: t('order.leaveConfirm'), danger: true, confirmText: t('common.back') }))) return;
     sessionStorage.removeItem(draftKey); sessionStorage.removeItem(`${draftKey}.key`);
-    nav('/tables');
+    nav('/new');
   };
 
   if (menu.loading && !menu.data) return <Loader label={t('loader.menu')} />;
@@ -115,7 +102,7 @@ export function OrderEntryPage() {
     <div className="pb-36">
       <div className="flex items-center gap-2 mb-4">
         <button className="btn-ghost !px-3" onClick={leave} aria-label={t('common.back')}>←</button>
-        <h1 className="text-2xl font-bold">{t('order.title', { table: table?.label ?? '' })}</h1>
+        <h1 className="text-2xl font-bold">{t('order.title', { table: hallName })}</h1>
         <span className={`chip ml-auto ${hall === 'ac' ? 'bg-[#DCEAF7] text-[#1D4E89]' : 'bg-accent-soft text-primary-dark'}`} data-testid="hall-chip">
           {hall === 'ac' ? '❄️' : '🌀'} {t('order.priceList', { hall: t(`hall.${hall}`) })}</span>
       </div>
@@ -191,7 +178,7 @@ export function OrderEntryPage() {
         </>}
       </Modal>
 
-      <Modal open={review} onClose={() => !saving && setReview(false)} title={t('order.confirmTitle', { table: table?.label ?? '' })}
+      <Modal open={review} onClose={() => !saving && setReview(false)} title={t('order.confirmTitle', { table: hallName })}
         footer={<><button className="btn-ghost" disabled={saving} onClick={() => setReview(false)}>{t('common.back')}</button>
           <button className="btn-primary" disabled={saving} onClick={submit} data-testid="confirm-order">{saving ? <><Spinner /> {t('order.saving')}</> : `✓ ${t('order.confirm')}`}</button></>}>
         <table className="w-full text-sm">

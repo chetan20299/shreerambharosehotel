@@ -69,20 +69,9 @@ for (const size of SIZES) {
     await page.getByRole('button', { name: 'Last 7 days' }).click();
     await page.waitForLoadState('networkidle');
     await shot('02-dashboard-7days');
-    await go('/tables', '03-tables');
-    await page.getByTestId('edit-layout').click();
-    await shot('04-tables-edit', false);
-    await page.getByTestId('empty-cell').first().click();
-    await shot('05-tables-add-block-sheet', false);
-    await page.getByTestId('add-table-here').click();
-    await shot('05b-tables-add-table-form', false);
-    await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.querySelector('[role=dialog]'));
-    await page.getByTestId('table-T2').click();
-    await shot('05c-tables-item-selected', false);
-    await page.getByRole('button', { name: 'Done' }).click();
+    await go('/new', '03-new-order');
 
-    await go('/order/t2', '06-order-entry');
+    await go('/order/nonac', '06-order-entry');
     await page.getByTestId('menu-thali-full').getByRole('button', { name: '+' }).click();
     await page.getByTestId('menu-extra').click();
     await page.getByTestId('extra-amount').fill('30');
@@ -135,7 +124,7 @@ for (const size of SIZES) {
         await fetch('/api/auth/preferences', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': s.csrf }, body: JSON.stringify({ language: l }) });
         localStorage.setItem('srbh.lang', l);
       }, lang);
-      await go('/tables', `20-${lang}-tables`);
+      await go('/new', `20-${lang}-new-order`);
       await go('/dashboard', `21-${lang}-dashboard`);
       await go('/settings', `22-${lang}-settings`);
     }

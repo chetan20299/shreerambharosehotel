@@ -16,7 +16,7 @@ import type { User } from '../types';
 type Item = { to: string; key: Key; icon: IconName; admin?: boolean };
 const NAV: Item[] = [
   { to: '/dashboard', key: 'nav.dashboard', icon: 'dashboard', admin: true },
-  { to: '/tables', key: 'nav.tables', icon: 'tables' },
+  { to: '/new', key: 'tables.newOrder', icon: 'plus' },
   { to: '/orders', key: 'nav.orders', icon: 'orders' },
   { to: '/reports', key: 'nav.reports', icon: 'reports' },
   { to: '/menu', key: 'nav.menu', icon: 'menu', admin: true },
@@ -119,11 +119,12 @@ export function AppLayout() {
     return window.innerWidth >= 1024; // tablets start collapsed (icons), desktops expanded
   });
   const isAdmin = user?.role === 'admin';
+  const isDemoMode = (() => { try { return !!localStorage.getItem('srbh.demo'); } catch { return false; } })();
   const items = NAV.filter((n) => !n.admin || isAdmin).map((n) => (n.to === '/settings' && !isAdmin ? { ...n, key: 'nav.account' as Key } : n));
   // Bottom bar: 2 tabs · big centre "New order" · 1 tab · More (drawer). Admin: Dashboard/Tables · Orders; waiter: Tables/Orders · Reports.
   const find = (to: string) => items.find((i) => i.to === to)!;
-  const bottomLeft = isAdmin ? [find('/dashboard'), find('/tables')] : [find('/tables'), find('/orders')];
-  const bottomRight = isAdmin ? [find('/orders')] : [find('/reports')];
+  const bottomLeft = isAdmin ? [find('/dashboard'), find('/orders')] : [find('/orders'), find('/reports')];
+  const bottomRight = isAdmin ? [find('/reports')] : [find('/settings')];
   const taskFocus = useFocusMode();
   const focusMode = loc.pathname.startsWith('/order/') || taskFocus; // order entry / layout editing use the full screen
   const mine = pending.filter((p) => p.waiterId === user?.id);
@@ -204,6 +205,12 @@ export function AppLayout() {
             <ProfileMenu onLogout={doLogout} />
           </div>
         </div>
+        {isDemoMode && (
+          <div className="bg-secondary text-white px-4 py-2 text-sm font-semibold flex flex-wrap items-center justify-between gap-2" data-testid="demo-banner">
+            <span>🧪 {t('demo.banner')}</span>
+            <button className="btn-ghost !min-h-9 !py-1 bg-white text-ink" onClick={doLogout}>{t('demo.exit')}</button>
+          </div>
+        )}
         {!online && <div className="bg-warning text-white px-4 py-2 text-sm font-semibold">{t('net.offline')}</div>}
         {mine.length > 0 && (
           <div className="bg-accent-soft border-t border-accent px-4 py-2 text-sm font-semibold flex flex-wrap items-center justify-between gap-2">
@@ -220,15 +227,15 @@ export function AppLayout() {
       {!focusMode && (
         <nav aria-label="Main" className="md:hidden fixed bottom-0 inset-x-0 z-30 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pointer-events-none" data-testid="bottom-nav">
           <div className="pointer-events-auto mx-auto max-w-md relative grid grid-cols-5 items-end rounded-[1.4rem] border border-line bg-card/95 backdrop-blur shadow-[0_8px_30px_rgba(43,29,20,.18)] px-1 pt-1.5 pb-1.5">
-            {bottomLeft.map((n) => <BottomTab key={n.to} item={n} label={t(n.key)} badge={n.to === '/orders' ? mine.length : 0} />)}
-            <NavLink to="/tables" aria-label={t('tables.newOrder')} data-testid="bottom-new-order"
+            {bottomLeft.map((n) => <BottomTab key={n.to} item={n} label={t(n.to === '/reports' ? 'nav.reportsShort' : n.key)} badge={n.to === '/orders' ? mine.length : 0} />)}
+            <NavLink to="/new" aria-label={t('tables.newOrder')} data-testid="bottom-new-order"
               className="flex flex-col items-center justify-end gap-1 -mt-7 text-[max(0.68rem,11px)] font-bold text-primary">
               <span className="grid place-items-center h-14 w-14 rounded-full bg-primary text-white shadow-lg shadow-primary/40 ring-4 ring-bg active:scale-95 transition">
                 <Icon name="plus" className="h-7 w-7" strokeWidth={2.5} />
               </span>
               <span className="leading-tight text-center line-clamp-1">{t('tables.newOrder')}</span>
             </NavLink>
-            {bottomRight.map((n) => <BottomTab key={n.to} item={n} label={t(n.key)} badge={n.to === '/orders' ? mine.length : 0} />)}
+            {bottomRight.map((n) => <BottomTab key={n.to} item={n} label={t(n.to === '/reports' ? 'nav.reportsShort' : n.key)} badge={n.to === '/orders' ? mine.length : 0} />)}
             <button onClick={() => setDrawer(true)} className="flex flex-col items-center gap-1 py-1 text-[max(0.68rem,11px)] font-semibold text-muted min-h-14" data-testid="bottom-more">
               <span className="grid place-items-center h-8 w-12 rounded-full"><Icon name="more" /></span>
               <span className="leading-tight line-clamp-1">{t('nav.more')}</span>

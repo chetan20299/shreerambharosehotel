@@ -28,7 +28,7 @@ Android like a normal app (a PWA), keeps taking orders without internet, and wor
 ## Features
 
 **For waiters**
-- Visual table layout with live status: Available · Order in progress · Occupied · Bill printed.
+- Simple order flow: **＋ New order → AC Hall or Non-AC Hall → pick dishes → Confirm → Print**.
 - Fast order entry: menu category tabs, +/− quantity buttons, and an **Extra** item with a custom amount and note.
 - **AC Hall / Non-AC Hall pricing.** The price list follows the table's hall automatically.
 - Bill printing:
@@ -40,11 +40,10 @@ Android like a normal app (a PWA), keeps taking orders without internet, and wor
 
 **For the admin (owner)**
 - **Dashboard:** sales, orders, thalis sold, extra collection, active waiters and table status. Charts show daily,
-  item-wise, waiter-wise, table-wise and hall-wise figures.
+  plus AC vs Non-AC sales, top items and the latest orders.
 - **Menu:** add, edit or remove items. Each item has separate Non-AC and AC prices.
 - **Menu categories** (Gujarati, Punjabi, Dal Bati, Chinese, Beverages and more). Switch a category off and
   waiters no longer see it.
-- **Tables and layout:** add sections (AC or Non-AC), add tables and drag them into position.
 - **Users:** create waiters, edit them, enable or disable them, and send password-reset links.
 - **Reports:** filter by date and time, waiter, table or item, then export **CSV / PDF / JSON** to download or share.
 - **Monthly history (automatic):** the current month keeps every order. Each earlier month is backed up and kept
@@ -205,7 +204,7 @@ Sample data:
 
 | What | Details |
 |---|---|
-| Halls | **Non-AC Hall** (T1–T6) and **AC Hall** (T7–T8) |
+| Halls | **Non-AC Hall** and **AC Hall** (prices differ by hall) |
 | Gujarati | Thali Full (₹130 / AC ₹150), Thali Small (₹50 / AC ₹60) |
 | Punjabi | Punjabi Thali (₹160 / AC ₹180) |
 | Dal Bati | Dal Bati Churma (₹120 / AC ₹140) |
@@ -219,16 +218,23 @@ To see the monthly roll-up, go to **Settings → Monthly retention (automatic) �
 > These users, passwords and Demo buttons exist **only** in the local demo. The demo login needs both
 > `DEMO_MODE=true` and a project id starting with `demo-`, so it can never switch on in production.
 
+### Demo on the live site (Netlify / Firebase)
+On a deployed site, **Demo as Admin** and **Demo as Waiter** start an **in-browser demo**. Sample menu, tables and
+orders are kept only in that browser, and **nothing is read from or written to the real database**. A green banner
+shows *"Demo mode — sample data, stays in this browser only"* with an **Exit demo** button. Real username + password
+logins always use the real database. (The shared print station is not available in the demo; direct Bluetooth,
+PDF and share are.)
+
 ### Suggested walkthrough
 
-1. **Demo as Waiter** → **Tables** → tap **T1** → add 2 × Gujarati Thali Full → **Add Extra** ₹25 →
+1. **Demo as Waiter** → **＋ New order** → **Non-AC Hall** → add 2 × Gujarati Thali Full → **Add Extra** ₹25 →
    **Review order** → **Confirm**. The bill opens.
 2. On the bill, try **Download PDF**, **Share bill** or **Print (Android)**. With a BLE printer, tap
    **Connect printer** and then **Print (Bluetooth)**.
-3. Open table **T7** (AC Hall) and notice the AC prices.
+3. Start another order in the **AC Hall** and notice the AC prices.
 4. Switch the language (top right) to ગુજરાતી or हिन्दी.
-5. **Logout** → **Demo as Admin** → explore the Dashboard, Menu (switch **Chinese** on), Users, Tables →
-   **Edit layout**, Export Reports and Settings.
+5. **Logout** → **Demo as Admin** → explore the Dashboard, Menu (switch **Chinese** on), Users,
+   Export Reports and Settings.
 6. To try offline mode, open Chrome DevTools → Network → **Offline**, take an order, then go back online and
    watch it sync.
 
@@ -371,7 +377,7 @@ Short version (full guide in [docs/OPERATIONS.md](docs/OPERATIONS.md)):
 | Region | `functions/src/index.ts`, `firebase.json` | `asia-south1` (Mumbai) |
 | Session length | `functions/src/security.ts` | 12 hours |
 | Hotel name, address, GSTIN, bill footer, paper width | In the app: **Settings → Hotel details** | Printed on bills |
-| Prices, categories, halls, tables | In the app: **Menu** and **Tables → Edit layout** | — |
+| Prices and categories (AC / Non-AC prices) | In the app: **Menu** | — |
 
 The frontend needs **no** environment variables or Firebase keys. It only calls `/api` on its own domain.
 

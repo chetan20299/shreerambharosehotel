@@ -89,7 +89,7 @@ export default function ReportsPage() {
           {!data.orders.length ? <Empty text={t('orders.none')} /> : (
             <div className="card overflow-x-auto">
               <table className="w-full text-sm min-w-[720px]">
-                <thead><tr>{(['bill.billNo', 'common.date', 'common.time', 'common.waiter', 'common.table', 'common.item', 'common.qty', 'common.rate', 'common.amount', 'common.total'] as const).map((k) =>
+                <thead><tr>{(['bill.billNo', 'common.date', 'common.time', 'common.waiter', 'common.hall', 'common.item', 'common.qty', 'common.rate', 'common.amount', 'common.total'] as const).map((k) =>
                   <th key={k} className={`th ${['common.qty', 'common.rate', 'common.amount', 'common.total'].includes(k) ? 'text-right' : ''}`}>{t(k)}</th>)}</tr></thead>
                 <tbody>{data.orders.flatMap((o) => o.items.map((i, k) => (
                   <tr key={`${o.id}-${k}`} className={o.status === 'cancelled' ? 'line-through text-muted' : ''}>

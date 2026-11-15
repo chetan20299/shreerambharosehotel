@@ -454,3 +454,18 @@ describe('grid floor plan', () => {
     expect(clash.status).toBe(400);
   });
 });
+
+describe('simple hall flow (no tables)', () => {
+  it('waiter picks AC / Non-AC, prices follow the hall, no table is touched', async () => {
+    const floorBefore = (await db.doc('floorLayouts/main').get()).data();
+    const ac = await call(ramesh, 'post', '/api/orders', { idempotencyKey: randomUUID(), hall: 'ac', items: [{ menuItemId: 'thali-full', quantity: 2 }] });
+    expect(ac.status, JSON.stringify(ac.body)).toBe(201);
+    expect(ac.body.order).toMatchObject({ priceCategory: 'ac', tableId: '', tableLabel: 'AC Hall', total: 300 });
+    const non = await call(ramesh, 'post', '/api/orders', { idempotencyKey: randomUUID(), hall: 'nonac', items: [{ menuItemId: 'thali-full', quantity: 2 }] });
+    expect(non.body.order).toMatchObject({ priceCategory: 'nonac', tableLabel: 'Non-AC Hall' });
+    expect((await call(ramesh, 'post', `/api/orders/${ac.body.order.id}/printed`)).status).toBe(200);
+    expect((await call(ramesh, 'get', `/api/orders/${ac.body.order.id}`)).body).toMatchObject({ status: 'billed', printCount: 1 });
+    expect((await db.doc('floorLayouts/main').get()).data()).toEqual(floorBefore); // floor plan untouched
+    expect((await call(ramesh, 'post', '/api/orders', { idempotencyKey: randomUUID(), items: [{ menuItemId: 'thali-full', quantity: 1 }] })).status).toBe(400);
+  });
+});

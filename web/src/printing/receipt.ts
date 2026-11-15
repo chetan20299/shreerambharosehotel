@@ -39,7 +39,7 @@ export function receiptLines(o: Order, s: Settings): Line[] {
     ...(s.gstin ? [{ text: ascii(`GSTIN: ${s.gstin}`), align: 'center' as const }] : []),
     hr,
     ...(o.billNo === PROVISIONAL ? [{ text: '** PROVISIONAL - NOT SAVED **', bold: true, align: 'center' as const }] : []),
-    ...pair(`Bill No: ${o.billNo}`, `Table: ${ascii(o.tableLabel)}`, w),
+    ...(o.tableId ? pair(`Bill No: ${o.billNo}`, `Table: ${ascii(o.tableLabel)}`, w) : [{ text: `Bill No: ${o.billNo}` }]),
     ...pair(`Date: ${o.date.split('-').reverse().join('-')}`, `Time: ${o.time.slice(0, 5)}`, w),
     ...wrap(ascii(`Waiter: ${o.waiterName}`), w).map((text) => ({ text })),
     ...(o.priceCategory ? [{ text: `Hall: ${HALL[o.priceCategory]}` }] : []),

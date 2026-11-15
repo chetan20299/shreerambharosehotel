@@ -22,7 +22,7 @@ export const pendingAsOrder = (p: PendingOrder): Order => {
   const ist = new Date(d.getTime() + 5.5 * 3600_000).toISOString();
   return {
     id: p.idempotencyKey, billNo: PROVISIONAL, date: ist.slice(0, 10), time: ist.slice(11, 19), waiterId: p.waiterId, waiterName: p.waiterName,
-    tableId: p.tableId, tableLabel: p.tableLabel, total: p.total, status: 'confirmed', createdAt: p.createdAt,
+    tableId: p.tableId, tableLabel: p.tableLabel, total: p.total, status: 'confirmed', createdAt: p.createdAt, priceCategory: p.hall,
     items: p.items.map((i) => ({ ...i, description: i.description ?? '', amount: Math.round(i.unitPrice * 100) * i.quantity / 100 })),
   };
 };
@@ -70,7 +70,7 @@ export function OrdersPage() {
             {pending.map((p) => (
               <div key={p.idempotencyKey} className="card p-3 border-warning bg-accent-soft/50 flex flex-wrap items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold">{t('common.table')} {p.tableLabel} · {inr(p.total)} <span className="chip bg-warning text-white ml-1">{t('net.pendingBadge')}</span></div>
+                  <div className="font-bold">{p.tableLabel} · {inr(p.total)} <span className="chip bg-warning text-white ml-1">{t('net.pendingBadge')}</span></div>
                   <div className="text-sm text-muted">{p.waiterName} · {new Date(p.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
                   {p.error && <div className="text-sm text-error font-semibold">{p.error}</div>}
                 </div>
@@ -99,7 +99,7 @@ export function OrdersPage() {
                 {isAdmin && <input type="checkbox" className="h-5 w-5 accent-primary" checked={selected.has(o.id)} onChange={() => toggle(o.id)} aria-label={o.billNo} />}
                 <Link to={`/orders/${o.id}`} className="flex-1 min-w-0 flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-bold">#{o.billNo} · {t('common.table')} {o.tableLabel}</div>
+                    <div className="font-bold">#{o.billNo} · {o.tableId ? `${t('common.table')} ${o.tableLabel}` : o.tableLabel}</div>
                     <div className="text-sm text-muted">{o.date} {o.time.slice(0, 5)} · {o.waiterName} · {o.items.map((i) => `${i.name} ×${i.quantity}`).join(', ')}</div>
                     {o.conflict && <div className="text-xs font-semibold text-warning">⚠️ {t('orders.conflict')}</div>}
                   </div>

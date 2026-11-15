@@ -9,7 +9,7 @@ import type { Order } from '../types';
  *   used the same table meanwhile (flagged as a conflict for the admin) and reports use the real sale time.
  */
 export interface PendingOrder {
-  idempotencyKey: string; waiterId: string; waiterName: string; tableId: string; tableLabel: string; createdAt: string;
+  idempotencyKey: string; waiterId: string; waiterName: string; hall?: 'ac' | 'nonac'; tableId: string; tableLabel: string; createdAt: string;
   items: { menuItemId: string; name: string; type: 'fixed' | 'custom'; isThali: boolean; quantity: number; unitPrice: number; description?: string }[];
   total: number; error?: string;
 }
@@ -27,8 +27,8 @@ export const subscribePending = (fn: () => void) => { listeners.add(fn); return 
 export const addPending = (p: PendingOrder) => save([...getPending().filter((x) => x.idempotencyKey !== p.idempotencyKey), p]);
 export const removePending = (key: string) => save(getPending().filter((x) => x.idempotencyKey !== key));
 
-export const toOrderBody = (p: Pick<PendingOrder, 'idempotencyKey' | 'tableId' | 'items'>, offline?: { createdAt: string }) => ({
-  idempotencyKey: p.idempotencyKey, tableId: p.tableId,
+export const toOrderBody = (p: Pick<PendingOrder, 'idempotencyKey' | 'items'> & { hall?: 'ac' | 'nonac'; tableId?: string }, offline?: { createdAt: string }) => ({
+  idempotencyKey: p.idempotencyKey, ...(p.hall ? { hall: p.hall } : {}), ...(p.tableId ? { tableId: p.tableId } : {}),
   items: p.items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity, unitPrice: i.type === 'custom' ? i.unitPrice : undefined, description: i.description || undefined })),
   ...(offline ? { offline: true, clientCreatedAt: offline.createdAt } : {}),
 });

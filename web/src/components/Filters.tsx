@@ -1,7 +1,7 @@
 import { useI18n } from '../i18n';
 import { useApi } from '../hooks';
 import { presetRange, istToday, type Preset } from '../utils/format';
-import type { MenuData, Section, Table, User } from '../types';
+import type { MenuData, User } from '../types';
 
 export interface FilterState {
   preset: Preset; from: string; to: string; fromTime: string; toTime: string;
@@ -23,7 +23,6 @@ export function Filters({ value, onChange, admin, times = true, presets = PRESET
 }) {
   const { t } = useI18n();
   const users = useApi<User[]>(admin ? '/users' : null, undefined, { cache: true });
-  const tables = useApi<{ sections: Section[]; tables: Table[] }>(admin ? '/tables' : null, undefined, { cache: true });
   const menu = useApi<MenuData>(admin ? '/menu' : null, undefined, { cache: true });
   const set = (p: Partial<FilterState>) => onChange({ ...value, ...p });
   const today = istToday();
@@ -47,14 +46,10 @@ export function Filters({ value, onChange, admin, times = true, presets = PRESET
         </div>
       )}
       {admin && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <select className="input" aria-label={t('common.waiter')} value={value.waiterId} onChange={(e) => set({ waiterId: e.target.value })}>
             <option value="">{t('common.waiter')}: {t('common.all')}</option>
             {(users.data ?? []).map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
-          </select>
-          <select className="input" aria-label={t('common.table')} value={value.tableId} onChange={(e) => set({ tableId: e.target.value })}>
-            <option value="">{t('common.table')}: {t('common.all')}</option>
-            {(tables.data?.tables ?? []).map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
           </select>
           <select className="input" aria-label={t('common.item')} value={value.menuItemId} onChange={(e) => set({ menuItemId: e.target.value })}>
             <option value="">{t('common.item')}: {t('common.all')}</option>

@@ -4,8 +4,8 @@
 import serverless from 'serverless-http';
 import { createApp } from '../../functions/lib/app.js';
 
-// DEMO_MODE=true (Netlify env var) = preview mode: demo logins with KNOWN passwords. Turn off before real use.
-const app = createApp({ bootstrapToken: () => process.env.BOOTSTRAP_TOKEN, demoMode: process.env.DEMO_MODE === 'true' });
+// The live API never has server-side demo users; the Demo buttons use an in-browser sample backend instead.
+const app = createApp({ bootstrapToken: () => process.env.BOOTSTRAP_TOKEN, demoMode: false });
 
 /** Requests may arrive as /.netlify/functions/api/<path> or /api/<path>; the app expects /api/<path>. */
 export const normalizePath = (url) => {

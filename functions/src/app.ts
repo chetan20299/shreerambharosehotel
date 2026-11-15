@@ -8,7 +8,7 @@ import {
   hashPassword, verifyPassword, dummyHash, newToken, sha256, safeEqual,
   parseCookies, sessionCookie, SESSION_COOKIE, SESSION_TTL_MS,
 } from './security.js';
-import { HttpError, buildItems, summarize, toExportJson, HOTEL_NAME, type MenuItem, type Order, type PriceCategory } from './orders.js';
+import { HttpError, buildItems, summarize, toExportJson, HOTEL_NAME, CATEGORY_LABEL, type MenuItem, type Order, type PriceCategory } from './orders.js';
 import { istParts, istToday, istRange, istToUtc, addDays } from './time.js';
 import { seedBase, seedDemo, DEMO_USERS } from './seed.js';
 import { runMonthlyRollup, mergeSummaries } from './retention.js';
@@ -338,10 +338,7 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
 
   // Demo login: only exists when DEMO_MODE=true on a demo-* emulator project. Never in production.
   if (opts.demoMode) {
-    r.get('/demo/status', async (_req, res) => {
-      await seedDemo(); // creates demo users + sample data once, so the listed logins work right away
-      res.json({ demo: true, logins: DEMO_USERS.map(({ username, password, role }) => ({ username, password, role })) });
-    });
+    r.get('/demo/status', (_req, res) => { res.json({ demo: true }); });
     r.post('/demo/login', async (req, res) => {
       const { as } = parse(z.object({ as: role }), req.body);
       await seedDemo();
@@ -612,7 +609,9 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
   // ===== Orders =====
   const CreateOrder = z.object({
     idempotencyKey: z.string().regex(/^[0-9a-f-]{36}$/i, 'Invalid idempotency key'),
-    tableId: id,
+    // Simple flow: the waiter picks the hall (AC / Non-AC). tableId is still accepted for older clients/data.
+    hall: z.enum(['ac', 'nonac']).optional(),
+    tableId: id.optional(),
     items: z.array(z.object({
       menuItemId: id, quantity: z.number().int().min(1).max(500),
       unitPrice: money.optional(), description: z.string().max(120).optional(),
@@ -631,21 +630,23 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
         if (existing.data()!.waiterId !== u.id) throw new HttpError(409, 'Duplicate order id');
         return { order: toOrder(existing), duplicate: true };
       }
-      const floor = await readFloor(tx);
-      const raw = floor.tables[b.tableId];
-      if (!raw) throw new HttpError(404, 'Table not found');
-      const t = viewTable(b.tableId, raw);
-      const tableBusy = t.status === 'occupied' || (t.status === 'in_progress' && t.lockedBy !== u.id);
+      if (!b.hall && !b.tableId) throw new HttpError(400, 'Choose AC or Non-AC hall');
+      // Hall orders don't touch the floor plan at all (3 reads + 2 writes per order).
+      const floor = b.tableId ? await readFloor(tx) : null;
+      const raw = b.tableId ? floor!.tables[b.tableId] : undefined;
+      if (b.tableId && !raw) throw new HttpError(404, 'Table not found');
+      const t = b.tableId ? viewTable(b.tableId, raw!) : null;
+      const tableBusy = !!t && (t.status === 'occupied' || (t.status === 'in_progress' && t.lockedBy !== u.id));
       // Online orders are rejected on a busy table. Offline orders already happened (food was served), so they are
       // accepted as a separate bill and flagged `conflict` for the admin instead of being lost.
-      if (tableBusy && !b.offline) {
+      if (t && tableBusy && !b.offline) {
         throw new HttpError(409, t.status === 'in_progress' ? `${t.lockedByName} is taking an order on ${t.label}` : `Table ${t.label} already has an active order`);
       }
       // Whole menu = 1 read. Items in a disabled category are treated as unavailable.
       const md = await readMenu(tx);
       const menu = new Map(Object.entries(md.items).map(([mid, m]) => [mid, { ...m, id: mid, active: m.active && !!md.categories[m.categoryId]?.active } as MenuItem]));
       // Price list follows the table's section: AC hall or Non-AC hall.
-      const priceCategory: PriceCategory = floor.sections.find((x) => x.id === t.sectionId)?.priceCategory ?? 'nonac';
+      const priceCategory: PriceCategory = t ? floor!.sections.find((x) => x.id === t.sectionId)?.priceCategory ?? 'nonac' : b.hall!;
       const { items, total } = buildItems(b.items, menu, priceCategory);
       const serverNow = Date.now();
       const client = b.offline && b.clientCreatedAt ? Date.parse(b.clientCreatedAt) : NaN;
@@ -658,7 +659,8 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
       const statsDoc = dayDoc?.orderCount !== undefined ? dayDoc : undefined;
       const billNo = `${date.slice(2).replaceAll('-', '')}-${String(seq).padStart(3, '0')}`;
       const order = {
-        billNo, date, time, waiterId: u.id, waiterName: u.displayName, tableId: b.tableId, tableLabel: t.label,
+        billNo, date, time, waiterId: u.id, waiterName: u.displayName,
+        tableId: b.tableId ?? '', tableLabel: t?.label ?? CATEGORY_LABEL[priceCategory], // hall orders: label = hall name
         items, total, status: 'confirmed', printCount: 0, createdAt: Timestamp.fromDate(now),
         offline: !!b.offline, conflict: tableBusy, priceCategory,
       };
@@ -666,7 +668,7 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
       tx.create(orderRef, { ...order, items: items.map(({ description, ...i }) => (description ? { ...i, description } : i)) });
       const asOrder = { ...order, id: orderRef.id, createdAt: now.toISOString() } as unknown as Order;
       tx.set(dayRef(date), { ...mergeSummaries(statsDoc, summarize([asOrder])), date, seq, updatedAt: FieldValue.serverTimestamp() });
-      if (!tableBusy) tx.update(FLOOR(), occupyTable(b.tableId, orderRef.id));
+      if (b.tableId && !tableBusy) tx.update(FLOOR(), occupyTable(b.tableId, orderRef.id));
       return { order: { ...order, id: orderRef.id, createdAt: now.toISOString() } as unknown as Order, duplicate: false };
     });
     res.status(result.duplicate ? 200 : 201).json(result);
@@ -688,7 +690,7 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
 
   async function markPrinted(o: Order) {
     await ordersCol().doc(o.id).update({ status: 'billed', printCount: FieldValue.increment(1), lastPrintedAt: FieldValue.serverTimestamp() });
-    await db.runTransaction(async (tx) => { // bill printed → table Available
+    if (o.tableId) await db.runTransaction(async (tx) => { // bill printed → table Available
       if ((await readFloor(tx)).tables[o.tableId]?.order === o.id) tx.update(FLOOR(), freeTable(o.tableId));
     });
     invalidate('tables', 'orders:', 'dash:');
@@ -705,7 +707,7 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
     const { reason } = parse(z.object({ reason: z.string().trim().min(3, 'Give a reason').max(200) }), req.body);
     if (o.status === 'cancelled') throw new HttpError(409, 'Already cancelled');
     await ordersCol().doc(o.id).update({ status: 'cancelled', cancelReason: reason, cancelledBy: me(req).id, cancelledAt: FieldValue.serverTimestamp() });
-    if ((await readFloor()).tables[o.tableId]?.order === o.id) await FLOOR().update(freeTable(o.tableId));
+    if (o.tableId && (await readFloor()).tables[o.tableId]?.order === o.id) await FLOOR().update(freeTable(o.tableId));
     await recomputeDay(o.date);
     await audit(me(req), 'order.cancelled', { orderId: o.id, billNo: o.billNo, total: o.total, reason });
     res.json({ ok: true });

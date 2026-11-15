@@ -32,27 +32,8 @@ async function demoAdmin(page: Page) {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   }
 }
-/** Clears any table lock/order left by an earlier (interrupted) run, as the admin would. */
-async function adminFreeTables(page: Page, ids: string[]) {
-  const r = await page.request.post('/api/demo/login', { data: { as: 'admin' } });
-  const { csrfToken } = await r.json();
-  for (const id of ids) await page.request.post(`/api/tables/${id}/free`, { headers: { 'X-CSRF-Token': csrfToken } });
-  await page.context().clearCookies();
-}
-async function freeTableIfBusy(page: Page, label: string) {
-  await page.goto('/tables');
-  const tile = page.getByTestId(`table-${label}`);
-  await expect(tile).toBeVisible();
-  if (!(await tile.getAttribute('aria-label'))?.includes('Available')) {
-    await tile.click();
-    await page.getByRole('button', { name: /Mark table free/ }).click();
-    await page.getByRole('dialog').last().getByRole('button', { name: 'Confirm' }).click();
-    await expect(tile).toHaveAttribute('aria-label', /Available/);
-  }
-}
 
 test('TEST 1: admin logs in and creates two waiter accounts', async ({ page }) => {
-  await adminFreeTables(page, ['t1', 't3', 't7']);
   await demoAdmin(page);
   await page.goto('/users');
   for (const w of [W1, W2]) {
@@ -66,12 +47,11 @@ test('TEST 1: admin logs in and creates two waiter accounts', async ({ page }) =
 });
 
 let orderUrl = '';
-test('TEST 2-6: waiter logs in, picks a table, adds 2 full thalis + Extra, order saved with correct total', async ({ page }) => {
+test('TEST 2-6: waiter logs in, picks Non-AC hall, adds 2 full thalis + Extra, order saved with correct total', async ({ page }) => {
   await login(page, W1.username, W1.password);
-  await expect(page).toHaveURL(/\/tables/);
-  await freeTableIfBusy(page, 'T1');
-  await page.getByTestId('table-T1').click();
-  await expect(page).toHaveURL(/\/order\/t1/);
+  await expect(page).toHaveURL(/\/new/); // waiters start on "New order"
+  await page.getByTestId('hall-nonac').click();
+  await expect(page).toHaveURL(/\/order\/nonac/);
   await expect(page.getByTestId('hall-chip')).toContainText('Non-AC');
   const full = page.getByTestId('menu-thali-full');
   await expect(full).toContainText('₹130');
@@ -86,11 +66,8 @@ test('TEST 2-6: waiter logs in, picks a table, adds 2 full thalis + Extra, order
   await page.getByTestId('confirm-order').click();
   await expect(page).toHaveURL(/\/orders\/[0-9a-f-]{36}/);
   await expect(page.getByText(/GRAND TOTAL\s+Rs\.285\.00/)).toBeVisible();
+  await expect(page.getByText('Hall: Non-AC Hall')).toBeVisible();
   orderUrl = page.url();
-  // order placed → table shows Occupied
-  await page.goto('/tables');
-  await expect(page.getByTestId('table-T1')).toHaveAttribute('aria-label', /Occupied/);
-  await page.goto(orderUrl);
   // Persisted server-side: reload reads it back from Firestore.
   await page.reload();
   await expect(page.getByText(/GRAND TOTAL\s+Rs\.285\.00/)).toBeVisible();
@@ -122,9 +99,9 @@ test('TEST 7: print shows printer status, needs connection, sends ESC/POS to a (
   expect(text).toContain('SHREE RAM BHAROSE HINDU HOTEL');
   expect(text).toMatch(/GRAND TOTAL\s+Rs\.285\.00/);
   await expect(page.getByText(/Printed 1 time/)).toBeVisible();
-  // bill printed → table becomes Available automatically
-  await page.goto('/tables');
-  await expect(page.getByTestId('table-T1')).toHaveAttribute('aria-label', /Available/);
+  // after printing: one tap to the next order
+  await page.getByTestId('bill-new-order').click();
+  await expect(page).toHaveURL(/\/new/);
 });
 
 test('TEST 8: admin changes menu price; old bill keeps original price', async ({ page }) => {
@@ -145,9 +122,8 @@ test('TEST 8: admin changes menu price; old bill keeps original price', async ({
 });
 
 test('AC hall uses AC prices; disabled categories are hidden from waiters', async ({ page }) => {
-  await adminFreeTables(page, ['t7']);
   await login(page, W2.username, W2.password);
-  await page.goto('/order/t7');
+  await page.getByTestId('hall-ac').click();
   await expect(page.getByTestId('hall-chip')).toContainText('AC Hall');
   await expect(page.getByTestId('menu-thali-small')).toContainText('₹65');
   await expect(page.getByTestId('cat-chinese')).toHaveCount(0);
@@ -159,15 +135,15 @@ test('AC hall uses AC prices; disabled categories are hidden from waiters', asyn
   await page.getByTestId('menu-search').fill('zzz');
   await expect(page.getByText('Nothing matches “zzz”')).toBeVisible();
   await page.getByTestId('menu-search').fill('');
-  await page.getByRole('button', { name: 'Back' }).click(); // releases the table lock
-  await expect(page).toHaveURL(/\/tables/);
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page).toHaveURL(/\/new/);
 });
 
 test('TEST 9/17: waiter cannot open admin pages or call admin APIs', async ({ page }) => {
   await login(page, W1.username, W1.password);
   for (const path of ['/users', '/menu', '/dashboard', '/history']) {
     await page.goto(path);
-    await expect(page).toHaveURL(/\/tables/);
+    await expect(page).toHaveURL(/\/new/);
   }
   const status = await page.evaluate(async () => (await fetch('/api/users', { credentials: 'same-origin' })).status);
   expect(status).toBe(403);
@@ -195,28 +171,16 @@ test('TEST 10/11: admin exports PDF, CSV, JSON; waiter exports own daily report'
   expect(json.transactions.every((t: { waiterName: string }) => t.waiterName === W1.name)).toBe(true);
 });
 
-test('TEST 12: admin changes the hotel layout', async ({ page }) => {
+test('Simple app: no Tables section anywhere', async ({ page }) => {
   await demoAdmin(page);
   await page.goto('/tables');
-  await page.getByTestId('edit-layout').click();
-  await expect(page.getByTestId('fixture-entry')).toBeVisible();
-  // move T2: tap it, then tap an empty block
-  await page.getByTestId('table-T2').click();
-  await expect(page.getByTestId('layout-toolbar')).toContainText('Tap an empty block to move T2');
-  await page.getByTestId('empty-cell').last().click();
-  // grow the grid and add an Exit door + a new table on empty blocks
-  await page.getByTestId('add-col').click();
-  await page.getByTestId('empty-cell').last().click();
-  await page.getByTestId('add-exit').click();
-  await page.getByTestId('empty-cell').first().click();
-  await page.getByTestId('add-table-here').click();
-  await page.getByTestId('table-label').fill('T20');
-  await page.getByTestId('table-save').click();
-  await expect(page.getByTestId('table-T20')).toBeVisible();
-  await page.getByTestId('save-layout').click();
-  await expect(page.getByText('Layout saved')).toBeVisible();
-  await expect(page.getByTestId('fixture-exit')).toHaveCount(2);
-  await expect(page.getByTestId('table-T20')).toBeVisible();
+  await expect(page).toHaveURL(/\/new/); // old link redirects to New order
+  await page.getByTestId('menu-button').click();
+  await expect(page.getByRole('dialog')).not.toContainText('Tables');
+  await page.keyboard.press('Escape');
+  await page.goto('/dashboard');
+  await expect(page.getByText('Table status')).toHaveCount(0);
+  await expect(page.getByText('Table-wise orders')).toHaveCount(0);
 });
 
 test('Monthly retention: admin runs rollup and sees monthly history', async ({ page }) => {
@@ -231,12 +195,12 @@ test('Monthly retention: admin runs rollup and sees monthly history', async ({ p
 
 test('Language switch: Gujarati and Hindi render, persist after reload, reports stay English', async ({ page }) => {
   await login(page, W1.username, W1.password);
-  await page.goto('/tables');
+  await page.goto('/new');
   await page.getByTestId('profile-button').click();
   await page.getByRole('radio', { name: 'ગુજરાતી' }).click();
-  await expect(page.getByRole('heading', { name: 'ટેબલ' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'નવો ઓર્ડર' })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'ટેબલ' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'નવો ઓર્ડર' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'gu');
   const glyphsOk = await page.evaluate(() => document.fonts.check('16px "Hind Vadodara"', 'ગુજરાતી'));
   expect(glyphsOk).toBe(true);
@@ -253,8 +217,9 @@ test('Language switch: Gujarati and Hindi render, persist after reload, reports 
 
 test('TEST 15: offline order is queued (not saved), then synced on reconnect without duplicates', async ({ page, context }) => {
   await login(page, W2.username, W2.password);
-  await freeTableIfBusy(page, 'T3');
-  await page.goto('/order/t3');
+  const count = () => page.evaluate(async () => (await (await fetch('/api/orders')).json()).orders.length as number);
+  const before = await count();
+  await page.goto('/order/nonac');
   await expect(page.getByTestId('menu-thali-full')).toBeVisible();
   await context.setOffline(true);
   await page.getByTestId('menu-thali-full').getByRole('button', { name: '+' }).click();
@@ -267,8 +232,7 @@ test('TEST 15: offline order is queued (not saved), then synced on reconnect wit
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect(page.getByText(/order\(s\) saved to the server/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Pending — not saved')).toHaveCount(0);
-  const r = await page.evaluate(async () => (await (await fetch('/api/orders')).json()).orders.filter((o: { tableLabel: string }) => o.tableLabel === 'T3').length);
-  expect(r).toBe(1);
+  expect(await count()).toBe(before + 1); // saved exactly once
 });
 
 test('TEST 16: revoked session cannot access protected operations', async ({ page, browser }) => {
@@ -337,9 +301,8 @@ test('Shared printer: waiter phone sends a bill to the print station phone, whic
   // Waiter phone (no printer): takes an order and sends the bill to the station.
   const wCtx = await browser.newContext({ ...(await import('@playwright/test')).devices['Pixel 7'] });
   const w = await wCtx.newPage();
-  await adminFreeTables(w, ['t5']);
   await login(w, W2.username, W2.password);
-  await w.goto('/order/t5');
+  await w.goto('/order/nonac');
   await w.getByTestId('menu-thali-full').getByRole('button', { name: '+' }).click();
   await w.getByRole('button', { name: /Review order/ }).click();
   await w.getByTestId('confirm-order').click();

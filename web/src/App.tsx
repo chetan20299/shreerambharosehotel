@@ -7,7 +7,7 @@ import { Loader } from './components/Brand';
 import { AppLayout } from './layouts/AppLayout';
 import { LoginPage } from './pages/Login';
 import { ResetPasswordPage } from './pages/ResetPassword';
-import { TablesPage } from './pages/Tables';
+import { NewOrderPage } from './pages/NewOrder';
 import { OrderEntryPage } from './pages/OrderEntry';
 import { BillPage } from './pages/Bill';
 import { OrdersPage } from './pages/Orders';
@@ -25,13 +25,13 @@ function Guard({ children, admin }: { children: ReactNode; admin?: boolean }) {
   const { t } = useI18n();
   if (loading) return <Loader full label={t('loader.startup')} />;
   if (!user) return <Navigate to="/login" replace />;
-  if (admin && user.role !== 'admin') return <Navigate to="/tables" replace />;
+  if (admin && user.role !== 'admin') return <Navigate to="/new" replace />;
   return <>{children}</>;
 }
 
 function Home() {
   const { user } = useAuth();
-  return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/tables'} replace />;
+  return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/new'} replace />;
 }
 
 function SwitchingOverlay() {
@@ -50,8 +50,9 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route element={<Guard><AppLayout /></Guard>}>
             <Route index element={<Home />} />
-            <Route path="tables" element={<TablesPage />} />
-            <Route path="order/:tableId" element={<OrderEntryPage />} />
+            <Route path="new" element={<NewOrderPage />} />
+            <Route path="order/:hall" element={<OrderEntryPage />} />
+            <Route path="tables" element={<Navigate to="/new" replace />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="orders/:id" element={<BillPage />} />
             <Route path="reports" element={<ReportsPage />} />
