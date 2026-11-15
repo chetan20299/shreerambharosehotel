@@ -27,3 +27,9 @@ export const monthLabel = (m: string, locale = 'en-IN') =>
   new Date(`${m}-01T00:00:00Z`).toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 export const uuid = () => crypto.randomUUID();
+
+/** "2026-11", -1 → "2026-10" (crosses years). */
+export function addMonths(month: string, n: number) {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7);
+}

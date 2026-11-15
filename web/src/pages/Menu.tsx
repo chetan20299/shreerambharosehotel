@@ -6,7 +6,7 @@ import { Empty, Field, Modal, PageHeader, SkeletonList, useUi } from '../compone
 import { inr } from '../utils/format';
 import type { MenuCategory, MenuData, MenuItem } from '../types';
 
-type ItemForm = Omit<MenuItem, 'id' | 'price' | 'acPrice'> & { id?: string; priceText: string; acText: string; samePrice: boolean };
+type ItemForm = Omit<MenuItem, 'id' | 'price' | 'acPrice'> & { id?: string; priceText: string };
 const money = (s: string) => /^\d+(\.\d{1,2})?$/.test(s) && Number(s) > 0 && Number(s) <= 100000;
 
 export default function MenuPage() {
@@ -18,13 +18,12 @@ export default function MenuPage() {
   const [filter, setFilter] = useState('');
   const cats = data?.categories ?? [];
 
-  const valid = !!form?.name.trim() && !!form.categoryId && (form.type === 'custom' || (money(form.priceText) && (form.samePrice || money(form.acText))));
+  const valid = !!form?.name.trim() && !!form.categoryId && (form.type === 'custom' || money(form.priceText));
   const save = async () => {
     if (!form) return;
-    const { id, priceText, acText, samePrice, ...rest } = form;
+    const { id, priceText, ...rest } = form;
     const custom = rest.type === 'custom';
-    // acPrice null = "same as Non-AC price" (server and order entry fall back to price).
-    const payload = { ...rest, price: custom ? 0 : Number(priceText), acPrice: custom || samePrice ? null : Number(acText), sort: Number(rest.sort) || 0 };
+    const payload = { ...rest, price: custom ? 0 : Number(priceText), acPrice: null, sort: Number(rest.sort) || 0 }; // one price for everyone
     try {
       await api(id ? `/menu/${id}` : '/menu', { method: id ? 'PATCH' : 'POST', body: payload });
       toast(t('common.saved'), 'success'); setForm(null); void reload(true);
@@ -54,7 +53,7 @@ export default function MenuPage() {
   };
 
   const items = (data?.items ?? []).filter((m) => !filter || m.categoryId === filter);
-  const newItem = (): ItemForm => ({ name: '', priceText: '', acText: '', samePrice: true, type: 'fixed', isThali: false, active: true, description: '', sort: 100, categoryId: filter || cats[0]?.id || '' });
+  const newItem = (): ItemForm => ({ name: '', priceText: '', type: 'fixed', isThali: false, active: true, description: '', sort: 100, categoryId: filter || cats[0]?.id || '' });
 
   return (
     <div>
@@ -93,12 +92,12 @@ export default function MenuPage() {
                     <div className="flex-1 min-w-[12rem]">
                       <div className="font-bold">{m.name} {m.isThali && <span aria-hidden>🍽️</span>}</div>
                       <div className="text-sm text-muted">
-                        {cat?.name ?? '—'} · {m.type === 'custom' ? t('menu.custom') : <>🌀 {inr(m.price)} · ❄️ {inr(m.acPrice ?? m.price)}</>}
+                        {cat?.name ?? '—'} · {m.type === 'custom' ? t('menu.custom') : inr(m.price)}
                       </div>
                     </div>
                     <button className={`chip !min-h-10 ${m.active ? 'bg-success/15 text-success' : 'bg-line text-muted'}`} onClick={() => patchItem(m, { active: !m.active })}>{m.active ? t('common.active') : t('common.inactive')}</button>
                     <button className="btn-ghost !min-h-10" data-testid={`edit-${m.id}`}
-                      onClick={() => setForm({ ...m, priceText: m.type === 'custom' ? '' : String(m.price), acText: m.acPrice == null ? '' : String(m.acPrice), samePrice: m.acPrice == null || m.acPrice === m.price })}>{t('common.edit')}</button>
+                      onClick={() => setForm({ ...m, priceText: m.type === 'custom' ? '' : String(m.price) })}>{t('common.edit')}</button>
                     <button className="btn-ghost !min-h-10 text-error" onClick={() => removeItem(m)}>{t('common.delete')}</button>
                   </div>
                 );
@@ -124,19 +123,8 @@ export default function MenuPage() {
               </select>
             </Field>
           </div>
-          {form.type === 'fixed' && <>
-            <label className="flex items-center gap-3 min-h-12 mb-2 rounded-xl border border-line bg-bg px-3">
-              <input type="checkbox" className="h-5 w-5 accent-primary" checked={form.samePrice} data-testid="same-price"
-                onChange={(e) => setForm({ ...form, samePrice: e.target.checked, acText: e.target.checked ? '' : form.acText || form.priceText })} />
-              <span className="font-semibold">{t('menu.samePrice')}</span>
-            </label>
-            <div className={`grid gap-x-3 ${form.samePrice ? 'grid-cols-1' : 'grid-cols-1 min-[420px]:grid-cols-2'}`}>
-              <Field label={form.samePrice ? `${t('common.price')} (₹) · 🌀 + ❄️` : `🌀 ${t('menu.nonacPrice')}`}><input className="input" inputMode="decimal" value={form.priceText} data-testid="menu-price"
-                onChange={(e) => setForm({ ...form, priceText: e.target.value.replace(/[^\d.]/g, '') })} /></Field>
-              {!form.samePrice && <Field label={`❄️ ${t('menu.acPrice')}`}><input className="input" inputMode="decimal" value={form.acText} data-testid="menu-ac-price"
-                onChange={(e) => setForm({ ...form, acText: e.target.value.replace(/[^\d.]/g, '') })} /></Field>}
-            </div>
-          </>}
+          {form.type === 'fixed' && <Field label={`${t('common.price')} (₹)`}><input className="input" inputMode="decimal" value={form.priceText} data-testid="menu-price"
+            onChange={(e) => setForm({ ...form, priceText: e.target.value.replace(/[^\d.]/g, '') })} /></Field>}
           <Field label={`${t('common.description')} (${t('common.optional')})`}><input className="input" maxLength={200} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
           <Field label={t('menu.sort')}><input className="input" type="number" inputMode="numeric" value={form.sort} onChange={(e) => setForm({ ...form, sort: Number(e.target.value) })} /></Field>
           <label className="flex items-center gap-3 min-h-12"><input type="checkbox" className="h-5 w-5 accent-primary" checked={form.isThali} onChange={(e) => setForm({ ...form, isThali: e.target.checked })} />{t('menu.isThali')}</label>

@@ -1,6 +1,6 @@
 import { db, Timestamp, FieldValue } from './db.js';
 import { saveBackup } from './backup.js';
-import { summarize, toExportJson, type Order } from './orders.js';
+import { summarize, toExportJson, addMonths, mergeSummaries, type Order } from './orders.js';
 import { istToday, istToUtc } from './time.js';
 import { FLOOR, readFloor, freeTable } from './store.js';
 
@@ -12,43 +12,9 @@ import { FLOOR, readFloor, freeTable } from './store.js';
  *  - Only the last 12 monthly summaries are kept; older ones are deleted.
  */
 type Summary = ReturnType<typeof summarize>;
-type Row = { amount: number } & Record<string, unknown>;
 
 const monthOf = (date: string) => date.slice(0, 7);
-export function addMonths(month: string, n: number) {
-  const [y, m] = month.split('-').map(Number) as [number, number];
-  const d = new Date(Date.UTC(y, m - 1 + n, 1));
-  return d.toISOString().slice(0, 7);
-}
-
-function mergeRows<T extends Row>(a: T[], b: T[], key: keyof T, counters: (keyof T)[]): T[] {
-  const m = new Map<unknown, T>(a.map((r) => [r[key], { ...r }]));
-  for (const r of b) {
-    const cur = m.get(r[key]);
-    if (!cur) { m.set(r[key], { ...r }); continue; }
-    for (const c of counters) (cur[c] as number) = Math.round(((cur[c] as number) + (r[c] as number)) * 100) / 100;
-  }
-  return [...m.values()];
-}
-
-/** Adds summary `b` into `a` (both shaped like summarize()). Exported for tests. */
-export function mergeSummaries(a: Summary | undefined, b: Summary): Summary {
-  if (!a) return b;
-  const r2 = (x: number) => Math.round(x * 100) / 100;
-  return {
-    orderCount: a.orderCount + b.orderCount,
-    cancelledCount: a.cancelledCount + b.cancelledCount,
-    totalAmount: r2(a.totalAmount + b.totalAmount),
-    thaliCount: a.thaliCount + b.thaliCount,
-    extraAmount: r2(a.extraAmount + b.extraAmount),
-    byItem: mergeRows(a.byItem, b.byItem, 'menuItemId', ['quantity', 'amount']).sort((x, y) => y.amount - x.amount),
-    byDay: mergeRows(a.byDay, b.byDay, 'key', ['orders', 'amount']).sort((x, y) => x.key.localeCompare(y.key)),
-    byWaiter: mergeRows(a.byWaiter, b.byWaiter, 'key', ['orders', 'amount']).sort((x, y) => y.amount - x.amount),
-    byTable: mergeRows(a.byTable, b.byTable, 'key', ['orders', 'amount']).sort((x, y) => x.label.localeCompare(y.label, undefined, { numeric: true })),
-    byCategory: mergeRows(a.byCategory ?? [], b.byCategory, 'key', ['orders', 'amount']).sort((x, y) => x.key.localeCompare(y.key)),
-    byHour: mergeRows(a.byHour ?? [], b.byHour ?? [], 'key', ['orders', 'amount']).sort((x, y) => x.key.localeCompare(y.key)),
-  };
-}
+export { addMonths, mergeSummaries };
 
 const toOrder = (d: FirebaseFirestore.QueryDocumentSnapshot): Order => {
   const x = d.data();

@@ -20,7 +20,7 @@ async function login(page: Page, username: string, password: string) {
 async function demoAdmin(page: Page) {
   await page.goto('/login');
   await page.getByRole('button', { name: 'Demo as Admin' }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 }); // first run seeds ~2 months of sample data
   // The language preference follows the user; earlier tests may have left the admin in another language.
   if ((await page.locator('html').getAttribute('lang')) !== 'en') {
     await page.evaluate(async () => {
@@ -47,12 +47,9 @@ test('TEST 1: admin logs in and creates two waiter accounts', async ({ page }) =
 });
 
 let orderUrl = '';
-test('TEST 2-6: waiter logs in, picks Non-AC hall, adds 2 full thalis + Extra, order saved with correct total', async ({ page }) => {
+test('TEST 2-6: waiter logs in, menu shows directly, adds 2 full thalis + Extra, order saved with correct total', async ({ page }) => {
   await login(page, W1.username, W1.password);
-  await expect(page).toHaveURL(/\/new/); // waiters start on "New order"
-  await page.getByTestId('hall-nonac').click();
-  await expect(page).toHaveURL(/\/order\/nonac/);
-  await expect(page.getByTestId('hall-chip')).toContainText('Non-AC');
+  await expect(page).toHaveURL(/\/new/); // waiters start on the menu
   const full = page.getByTestId('menu-thali-full');
   await expect(full).toContainText('₹130');
   await full.getByRole('button', { name: '+' }).click();
@@ -64,13 +61,25 @@ test('TEST 2-6: waiter logs in, picks Non-AC hall, adds 2 full thalis + Extra, o
   await expect(page.getByTestId('cart-total')).toHaveText('₹285');
   await page.getByRole('button', { name: /Review order/ }).click();
   await page.getByTestId('confirm-order').click();
+  await expect(page.getByTestId('overlay-saving').or(page.getByTestId('overlay-done'))).toBeVisible(); // animated feedback
+  await expect(page.getByText(/Order placed ✓ Bill \d{3}-\d{8}-\d{4}/)).toBeVisible();
   await expect(page).toHaveURL(/\/orders\/[0-9a-f-]{36}/);
+  await expect(page.getByRole('heading', { name: /Bill #\d{3}-\d{8}-\d{4}/ })).toBeVisible(); // 001-DDMMYYYY-HHMM
   await expect(page.getByText(/GRAND TOTAL\s+Rs\.285\.00/)).toBeVisible();
-  await expect(page.getByText('Hall: Non-AC Hall')).toBeVisible();
+  await expect(page.getByText(/Hall:|Ph:/)).toHaveCount(0); // not printed on the bill
+  // only Print + Share; Add item adds to this same bill
+  await expect(page.getByTestId('print-bt')).toBeVisible();
+  await expect(page.getByTestId('share-bill')).toBeVisible();
+  await page.getByTestId('bill-add-item').click();
+  await page.getByTestId('menu-water-bottle').getByRole('button', { name: '+' }).click();
+  await page.getByRole('button', { name: /Review order/ }).click();
+  await page.getByTestId('confirm-order').click();
+  await expect(page.getByText('Items added ✓')).toBeVisible();
+  await expect(page.getByText(/GRAND TOTAL\s+Rs\.305\.00/)).toBeVisible();
   orderUrl = page.url();
   // Persisted server-side: reload reads it back from Firestore.
   await page.reload();
-  await expect(page.getByText(/GRAND TOTAL\s+Rs\.285\.00/)).toBeVisible();
+  await expect(page.getByText(/GRAND TOTAL\s+Rs\.305\.00/)).toBeVisible();
 });
 
 test('TEST 7: print shows printer status, needs connection, sends ESC/POS to a (simulated) BLE printer', async ({ page }) => {
@@ -87,20 +96,15 @@ test('TEST 7: print shows printer status, needs connection, sends ESC/POS to a (
   });
   await login(page, W1.username, W1.password);
   await page.goto(orderUrl);
-  await page.getByText(/Connect printer \(Printer not connected\)/).click();
-  const card = page.getByTestId('printer-card');
-  await expect(card).toContainText('Printer not connected');
-  await expect(page.getByTestId('print-bt')).toHaveCount(0); // cannot print until connected
-  await card.getByRole('button', { name: /Connect printer/ }).click();
-  await expect(card).toContainText('SIM-58 Printer');
-  await page.getByTestId('print-bt').click();
-  await expect(page.getByText('Printer received the bill ✓')).toBeVisible();
+  await page.getByTestId('print-bt').click(); // connects the printer on first tap, then prints
+  await expect(page.getByText('Bill printed ✓')).toBeVisible();
   const text = await page.evaluate(() => String.fromCharCode(...(window as unknown as { __printed: number[] }).__printed));
   expect(text).toContain('SHREE RAM BHAROSE HINDU HOTEL');
-  expect(text).toMatch(/GRAND TOTAL\s+Rs\.285\.00/);
+  expect(text).toMatch(/GRAND TOTAL\s+Rs\.305\.00/);
+  expect(text).not.toMatch(/Ph:|Hall:/);
   await expect(page.getByText(/Printed 1 time/)).toBeVisible();
-  // after printing: one tap to the next order
-  await page.getByTestId('bill-new-order').click();
+  // Cancel print & go back → the menu
+  await page.getByTestId('bill-cancel-print').click();
   await expect(page).toHaveURL(/\/new/);
 });
 
@@ -109,23 +113,16 @@ test('TEST 8: admin changes menu price; old bill keeps original price', async ({
   await page.goto('/menu');
   await page.getByTestId('edit-thali-small').click();
   await page.getByTestId('menu-price').fill('55');
-  await expect(page.getByTestId('same-price')).not.toBeChecked();
-  await page.getByTestId('same-price').check();
-  await expect(page.getByTestId('menu-ac-price')).toHaveCount(0);
-  await page.getByTestId('same-price').uncheck();
-  await page.getByTestId('menu-ac-price').fill('65');
   await page.getByTestId('menu-save').click();
-  await expect(page.getByText('🌀 ₹55 · ❄️ ₹65')).toBeVisible();
+  await expect(page.getByTestId('edit-thali-small').locator('..')).toContainText('₹55');
   await page.waitForFunction(() => !history.state?.modal); // modal's history entry popped
   await page.goto(orderUrl);
-  await expect(page.getByText(/GRAND TOTAL\s+Rs\.285\.00/)).toBeVisible();
+  await expect(page.getByText(/GRAND TOTAL\s+Rs\.305\.00/)).toBeVisible();
 });
 
-test('AC hall uses AC prices; disabled categories are hidden from waiters', async ({ page }) => {
+test('One price list; disabled categories are hidden from waiters', async ({ page }) => {
   await login(page, W2.username, W2.password);
-  await page.getByTestId('hall-ac').click();
-  await expect(page.getByTestId('hall-chip')).toContainText('AC Hall');
-  await expect(page.getByTestId('menu-thali-small')).toContainText('₹65');
+  await expect(page.getByTestId('menu-thali-small')).toContainText('₹55');
   await expect(page.getByTestId('cat-chinese')).toHaveCount(0);
   await expect(page.getByTestId('menu-veg-manchurian')).toHaveCount(0);
   await expect(page.getByTestId('menu-water-bottle')).toBeVisible();
@@ -135,8 +132,6 @@ test('AC hall uses AC prices; disabled categories are hidden from waiters', asyn
   await page.getByTestId('menu-search').fill('zzz');
   await expect(page.getByText('Nothing matches “zzz”')).toBeVisible();
   await page.getByTestId('menu-search').fill('');
-  await page.getByRole('button', { name: 'Back' }).click();
-  await expect(page).toHaveURL(/\/new/);
 });
 
 test('TEST 9/17: waiter cannot open admin pages or call admin APIs', async ({ page }) => {
@@ -219,7 +214,7 @@ test('TEST 15: offline order is queued (not saved), then synced on reconnect wit
   await login(page, W2.username, W2.password);
   const count = () => page.evaluate(async () => (await (await fetch('/api/orders')).json()).orders.length as number);
   const before = await count();
-  await page.goto('/order/nonac');
+  await page.goto('/new');
   await expect(page.getByTestId('menu-thali-full')).toBeVisible();
   await context.setOffline(true);
   await page.getByTestId('menu-thali-full').getByRole('button', { name: '+' }).click();
@@ -302,15 +297,15 @@ test('Shared printer: waiter phone sends a bill to the print station phone, whic
   const wCtx = await browser.newContext({ ...(await import('@playwright/test')).devices['Pixel 7'] });
   const w = await wCtx.newPage();
   await login(w, W2.username, W2.password);
-  await w.goto('/order/nonac');
+  await w.goto('/new');
   await w.getByTestId('menu-thali-full').getByRole('button', { name: '+' }).click();
   await w.getByRole('button', { name: /Review order/ }).click();
   await w.getByTestId('confirm-order').click();
   await expect(w).toHaveURL(/\/orders\/[0-9a-f-]{36}/);
-  await expect(w.getByTestId('send-station')).toContainText(/Online/);
-  await w.getByTestId('send-to-station').click();
-  await w.getByTestId('send-to-station').click(); // double tap → still one job
-  await expect(w.getByText('Printed by the print station ✓').first()).toBeVisible({ timeout: 25_000 });
+  await w.getByTestId('print-bt').click(); // no printer on this phone → goes to the print station
+  await expect(w.getByText('Sent to the print station ✓')).toBeVisible();
+  await expect.poll(async () => st.evaluate(() => String.fromCharCode(...(window as unknown as { __printed: number[] }).__printed).includes('GRAND TOTAL')), { timeout: 25_000 }).toBe(true);
+  await w.reload();
   const printed = await st.evaluate(() => String.fromCharCode(...(window as unknown as { __printed: number[] }).__printed));
   expect(printed.match(/GRAND TOTAL/g)?.length).toBe(1); // printed exactly once
   await expect(w.getByText(/Printed 1 time/)).toBeVisible();

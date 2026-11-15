@@ -7,7 +7,6 @@ import { Loader } from './components/Brand';
 import { AppLayout } from './layouts/AppLayout';
 import { LoginPage } from './pages/Login';
 import { ResetPasswordPage } from './pages/ResetPassword';
-import { NewOrderPage } from './pages/NewOrder';
 import { OrderEntryPage } from './pages/OrderEntry';
 import { BillPage } from './pages/Bill';
 import { OrdersPage } from './pages/Orders';
@@ -50,8 +49,8 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route element={<Guard><AppLayout /></Guard>}>
             <Route index element={<Home />} />
-            <Route path="new" element={<NewOrderPage />} />
-            <Route path="order/:hall" element={<OrderEntryPage />} />
+            <Route path="new" element={<OrderEntryPage />} />
+            <Route path="order/*" element={<Navigate to="/new" replace />} />
             <Route path="tables" element={<Navigate to="/new" replace />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="orders/:id" element={<BillPage />} />

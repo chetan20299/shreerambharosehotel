@@ -71,7 +71,7 @@ for (const size of SIZES) {
     await shot('02-dashboard-7days');
     await go('/new', '03-new-order');
 
-    await go('/order/nonac', '06-order-entry');
+    await go('/new', '06-order-entry');
     await page.getByTestId('menu-thali-full').getByRole('button', { name: '+' }).click();
     await page.getByTestId('menu-extra').click();
     await page.getByTestId('extra-amount').fill('30');
@@ -100,7 +100,6 @@ for (const size of SIZES) {
     await shot('11-reports-custom');
     await go('/menu', '12-menu');
     await page.getByRole('button', { name: '+ Add item' }).click();
-    await page.getByTestId('same-price').uncheck();
     await shot('13-menu-item-dialog', false);
     await page.keyboard.press('Escape');
     await go('/users', '14-users');

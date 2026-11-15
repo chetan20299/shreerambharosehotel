@@ -1,7 +1,7 @@
 import { db, FieldValue, Timestamp } from './db.js';
 import { hashPassword } from './security.js';
 import { istParts } from './time.js';
-import { summarize, type Order } from './orders.js';
+import { billNumber, summarize, type Order } from './orders.js';
 
 const CATEGORIES = [
   { id: 'gujarati', name: 'Gujarati', active: true, sort: 10 },
@@ -100,7 +100,7 @@ export async function seedDemo() {
       ];
       const ref = db.collection('orders').doc();
       const doc = {
-        billNo: `${date.slice(2).replaceAll('-', '')}-${String(k + 1).padStart(3, '0')}`, date, time,
+        billNo: billNumber(k + 1, date, time), date, time,
         waiterId: w.username, waiterName: w.displayName, tableId: `t${tableNo}`, tableLabel: `T${tableNo}`,
         items, total: items.reduce((s, i) => s + i.amount, 0), status: 'billed', printCount: 1, priceCategory: ac ? 'ac' : 'nonac',
         createdAt: Timestamp.fromDate(at), demo: true,

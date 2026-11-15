@@ -1,108 +1,114 @@
-# Deployment
+# Deployment (free Firebase Spark plan)
 
-The same code runs in two places:
+The app uses **only Firebase's free services**: Hosting (the app), Firestore (all data) and Authentication
+(username + password logins). There are no Cloud Functions, no Netlify and no Google sign-in.
 
-| | **A. Netlify (temporary)** | **B. Firebase (production)** |
+```
+Phone (installed app)  ──►  Firebase Hosting       the app's files
+        │
+        ├──────────────►  Firebase Authentication  checks username + password (stored hashed)
+        └──────────────►  Firestore                orders, menu, users, reports
+                              ▲
+                     firestore.rules decide who may read/write what
+```
+
+## What goes in env
+
+One file: **`web/.env.local`** (copy `web/.env.example`). Get the values from Firebase console →
+⚙ Project settings → General → *Your apps* → the web app → **Config**.
+
+| Variable | Example | Where it comes from |
 |---|---|---|
-| Frontend | Netlify CDN (`web/dist`) | Firebase Hosting |
-| API | Netlify Function `netlify/functions/api.mjs` (same Express app) | Cloud Function `api` |
-| Database | Firestore on the **free Spark plan** | Firestore (Blaze plan, inside the free quota) |
-| Backups | Inside Firestore, gzip-compressed (`BACKUP_TARGET=firestore`) | Cloud Storage |
-| Nightly retention | Netlify scheduled function (02:30 IST) | Cloud Scheduler (02:30 IST) |
-| Login cookie | Works: `/api/*` is proxied on the same domain | Works |
+| `VITE_FIREBASE_API_KEY` | `AIzaSy...` | `apiKey` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `srbh-hotel.firebaseapp.com` | `authDomain` |
+| `VITE_FIREBASE_PROJECT_ID` | `srbh-hotel` | `projectId` |
+| `VITE_FIREBASE_APP_ID` | `1:1234:web:abcd` | `appId` |
 
-Data lives in Firestore in both cases, so **moving from Netlify to Firebase later needs no data migration.**
+These are not secrets: every Firebase web app sends them to the browser. Security comes from `firestore.rules` plus the
+login. `*.local` files are git-ignored anyway.
 
----
+## Steps
 
-## A. Netlify (temporary)
-
-### 1. Firebase project for the database (free Spark plan)
-1. <https://console.firebase.google.com> → **Add project** (for example `srbh-hotel`). The Spark plan is fine.
-2. **Build → Firestore Database → Create database** → Production mode → location **asia-south1 (Mumbai)**.
-3. From the project folder on your computer, deploy the security rules and indexes (this works on Spark):
+1. **Create the project.** <https://console.firebase.google.com> → *Create a project* → name it (e.g. `srbh-hotel`)
+   → turn Google Analytics off → *Create*. New projects start on the free **Spark** plan. Don't upgrade.
+2. **Turn on username/password logins.** *Build → Authentication → Get started → Sign-in method* →
+   **Email/Password** → enable the first switch only → *Save*. Don't add Google or any other provider.
+   (Staff never see an email address. The app turns `ramesh` into a hidden `ramesh@srbh.example.com` internally.)
+   In *Authentication → Settings → User actions*, keep **Enable create (sign-up)** ON. The admin's phone uses it to
+   create waiter logins.
+3. **Create the database.** *Build → Firestore Database → Create database* → Standard edition, ID `(default)` →
+   location **asia-south1 (Mumbai)** (permanent) → **Production mode** → *Create*.
+4. **Register the web app.** *Project Overview → + Add app → Web (</>)* → nickname `srbh-web` → *Register app*.
+   Copy the four config values into `web/.env.local` (table above).
+5. **Link this folder** (terminal in the project folder):
    ```powershell
    npx firebase login
-   npx firebase use --add          # pick the project, alias: prod
-   npx firebase deploy --only firestore
+   npx firebase use --add        # pick the project, alias: prod
    ```
-4. **Project settings → Service accounts → Generate new private key**. A JSON file downloads.
-   **Never commit it.** The `.gitignore` already blocks `*service-account*.json`, but keep it outside the repo anyway.
-
-### 2. Netlify site
-1. Push the repo to GitHub (see the README Git section).
-2. <https://app.netlify.com> → **Add new site → Import from Git** → pick the repo. Netlify reads `netlify.toml`
-   automatically: build `npm run install:all && npm run build`, publish `web/dist`, functions `netlify/functions`.
-3. **Site configuration → Environment variables** → add these (scope: Builds + Functions):
-
-| Variable | Value |
-|---|---|
-| `FIREBASE_PROJECT_ID` | `project_id` from the JSON file |
-| `FIREBASE_CLIENT_EMAIL` | `client_email` from the JSON file |
-| `FIREBASE_PRIVATE_KEY` | `private_key` from the JSON file. Paste it exactly, including `-----BEGIN PRIVATE KEY-----` and the `\n`s |
-| `BOOTSTRAP_TOKEN` | a random secret of 32+ characters (needed once to create the admin; keep it private) |
-| `BACKUP_TARGET` | `firestore` |
-| `CACHE_TTL_MS` | `10000` |
-
-4. **Deploys → Trigger deploy**. When it finishes, open `https://<your-site>.netlify.app`.
-
-### 3. Create the first admin (once)
-```powershell
-curl.exe -X POST https://<your-site>.netlify.app/api/bootstrap -H "Content-Type: application/json" -d '{\"secret\":\"<BOOTSTRAP_TOKEN>\",\"username\":\"owner\",\"displayName\":\"Owner\",\"password\":\"<strong password>\"}'
-```
-This creates the admin plus the starting menu, halls and tables. Then log in as `owner`, set the real prices, and
-add your waiters.
-
-### Demo for viewers (no database involved)
-The **Demo as Admin / Demo as Waiter** buttons on the login page always work. They run the app against a sample
-backend **inside the browser**, with sample menu, tables and orders stored only on that device. Nothing is read from or
-written to Firestore, and no demo accounts exist on the server. Real logins (username + password) always use the real
-database.
-
-### 4. Check it
-- Log in on a phone in Chrome, take an order, print or share the bill, and open the dashboard.
-- Bluetooth printing needs HTTPS, and Netlify gives you that automatically.
-- Install the app: Chrome ⋮ → **Install app**.
-
-### Netlify limits (why some settings differ)
-- **Function-call quota.** Every API call is one Netlify function call, and Netlify's free plan has a monthly quota.
-  The legacy free tier allowed about 125k calls a month; newer accounts use credits, so check *Usage* in the Netlify dashboard. To stay inside it,
-  `netlify.toml` sets slower automatic refreshes:
-  - **Tables:** every 60 s (Firebase: 15 s).
-  - **Print-station check:** every 15 s (Firebase: 5 s), so a sent bill can take up to about 15 s to start printing.
-  - **Station "I'm online" signal:** every 60 s.
-- **Several function copies.** Netlify may run more than one copy of the function at once, so caches last only
-  10 s (`CACHE_TTL_MS`). The print-station status is kept in Firestore, so every copy agrees.
-- **10-second request limit.** Very large bulk deletes may need to be done one day at a time.
-- **No Cloud Storage on Spark.** Backups are stored compressed in Firestore. Download them from
-  **Settings → Server backups**.
-
-### Check the Netlify function locally (no Netlify account needed)
-```powershell
-npx firebase emulators:exec --project demo-srbh --only firestore "node netlify/smoke-test.mjs"
-```
-Expected: `NETLIFY SMOKE TEST PASSED`. This covers path rewriting, admin creation, the login cookie, the API and Firestore backups.
-
----
-
-## B. Firebase (production)
-
-1. In the same Firebase project, upgrade to **Blaze**. Set a budget alert of ₹100 (see [FREE_TIER_PLAN.md](FREE_TIER_PLAN.md)).
-2. Enable **Storage** (Build → Storage → Get started, location `asia-south1`).
-3. Set the secret, then deploy:
+6. **Deploy** the app, the security rules and the indexes:
    ```powershell
-   npx firebase use prod
-   npx firebase functions:secrets:set BOOTSTRAP_TOKEN      # same value as on Netlify is fine
-   npx firebase functions:artifacts:setpolicy               # keeps old function images within the free storage
    npm run deploy
    ```
-4. Open `https://<project-id>.web.app`. Your data from the Netlify period is already there: same Firestore, same
-   admin, same orders.
-5. **Backups made on Netlify** stay readable in Firestore. New backups go to Cloud Storage. To keep using
-   Firestore backups on Firebase instead, set `BACKUP_TARGET=firestore` in `functions/.env.<project-id>`.
-6. Turn off the Netlify site (Site configuration → **Delete site**, or just stop using it). Waiters should
-   reinstall the app from the new URL, because an installed app is tied to the address it came from.
+   It builds `web/` with your `.env.local` and runs `firebase deploy --only hosting,firestore`.
+   The final lines show **Hosting URL: https://<project-id>.web.app**. Indexes take 2–5 minutes to build. Until they're
+   ready, some lists show "The database is still preparing an index".
+7. **Create the owner account.** Open the Hosting URL. On an empty database the login page shows **First-time
+   setup**: enter your name, a username (e.g. `owner`) and a password of 8+ characters → *Create owner account*.
+   This screen is then locked for good. Do this straight after the first deploy.
+8. **Set up the hotel.** *Menu*: set the real prices (the AC prices are placeholders). *Users → Add*: one login per
+   waiter. *Settings*: hotel name, address and phone for the bill.
+9. **Check the data.** Console → *Firestore Database → Data* should show `users`, `logins`, `config` (`menu`,
+   `setup`), `hotelSettings`, and after a test order `orders`, `dailyStats` and `auditLogs`. *Authentication → Users*
+   lists the hidden login emails.
+10. **Install on phones.** Chrome → open the URL → ⋮ → *Install app*. Pair the Bluetooth printer on the phone next to it.
 
-### Switching back and forth
-Both deployments can run at the same time against the same Firestore project. That's handy for testing.
-Pick **one** URL for the waiters, though, so that only one print station is in use.
+Updates later: `npm run deploy` again. Rules only: `npm run deploy:rules`.
+
+## Where things are stored
+
+| What | Where |
+|---|---|
+| Passwords | Firebase Authentication, hashed (scrypt). Nobody can read them, not even the owner. |
+| Staff profile (name, role, active) | Firestore `users/{username}` |
+| Hidden login email per username | Firestore `logins/{username}` |
+| Menu (all items, 1 document) | `config/menu` |
+| Bills | `orders/{id}`; per-day totals in `dailyStats/{date}`; month totals in `monthlySummaries/{YYYY-MM}` |
+| Print queue and station | `printJobs`, `printStation/main` |
+| Audit trail, exports | `auditLogs`, `exportHistory` |
+| Backups (before deletes and month roll-ups) | `backups/{name}`, gzip-compressed |
+
+## How the free plan changes things
+
+- **Monthly clean-up** (old months rolled into one summary, kept for 12 months) runs when the admin opens the app,
+  at most once a day, instead of on a nightly server timer.
+- **Backups** are stored gzip-compressed in Firestore. Download them from *Settings → Server backups*.
+- **Forgotten waiter password:** the admin sets a new one in *Users → Edit → New password*. The old password stops
+  working immediately. (Reset links are gone.)
+- **Disabling a user** in *Users* locks them out within a minute, and the database refuses them immediately.
+- **Prices are calculated on the phone.** The rules stop a waiter from touching other bills, the menu, users or
+  reports. A tech-savvy waiter could still alter the price on a bill they create themselves. Every bill shows up in
+  the admin's reports and audit trail.
+
+## Owner password recovery
+
+1. Firebase console → *Firestore Database → Data* → `config` → delete the document **`setup`**.
+2. Open the app: the **First-time setup** screen is back. Enter the **same username** and a new password.
+   Menu, settings, orders and other users are kept.
+
+While `setup` is deleted, anyone who opens the app could do this, so finish both steps right away.
+
+## Free-tier limits (about 150 orders a day)
+
+Firestore free: 50,000 reads, 20,000 writes and 20,000 deletes per day, 1 GiB stored. This app uses a few thousand per
+day. Live listeners make repeat checks (print queue, menu, settings) free, so only real changes are billed.
+Hosting: 10 GB stored, 360 MB/day transfer. The installed app loads from the phone's cache. Authentication with
+email/password is free.
+
+## Test locally before deploying
+
+```powershell
+npm run test:free
+```
+This starts the Auth + Firestore emulators with the real `firestore.rules`, runs the app in Chromium and checks the
+main flows and the security rules: setup, login, waiters, AC/Non-AC prices, print station, dashboard, password reset,
+backups, and blocked attacks. Expected: `FREE PLAN CHECK PASSED`. Needs Java 21 for the emulators.

@@ -1,11 +1,68 @@
 rules_version = '2';
-// This app uses custom session cookies, which Security Rules cannot see.
-// ALL reads/writes go through the `api` Cloud Function (Admin SDK bypasses rules).
-// Direct client access is therefore denied completely.
+// Free plan (Spark): the app talks to Firestore directly, so these rules ARE the security.
+// Login = Firebase Auth email/password with a hidden email per username (ramesh@srbh.example.com, or
+// ramesh+1@... after an admin sets a new password). users/{username}.uid says which Auth account is current.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+    function signedIn() { return request.auth != null && request.auth.token.email is string; }
+    function uname() { return request.auth.token.email.split('@')[0].split('[+]')[0]; }
+    function userPath() { return /databases/$(database)/documents/users/$(uname()); }
+    function staff() { return signedIn() && exists(userPath()) && get(userPath()).data.uid == request.auth.uid && get(userPath()).data.active == true; }
+    function admin() { return staff() && get(userPath()).data.role == 'admin'; }
+    function setupDone() { return exists(/databases/$(database)/documents/config/setup); }
+    // First owner account only: while config/setup does not exist, in the same batch that creates it.
+    // (Owner password recovery: delete config/setup in the Firebase console, then run setup again.)
+    function bootstrapping() { return signedIn() && !setupDone() && existsAfter(/databases/$(database)/documents/config/setup); }
+    function changes(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+    match /users/{u} {
+      allow read: if admin() || (signedIn() && u == uname());
+      allow create, update: if admin()
+        || (bootstrapping() && u == uname() && request.resource.data.uid == request.auth.uid && request.resource.data.role == 'admin' && request.resource.data.active == true);
+      allow update: if staff() && u == uname() && changes(['language', 'lastSeenAt', 'lastLoginAt']);
+    }
+    // Only the hidden login email, so the login screen can turn a username into it.
+    match /logins/{u} {
+      allow get: if true;
+      allow write: if admin() || (bootstrapping() && u == uname());
+    }
+
+    match /config/{id} {
+      allow get: if id == 'setup';
+      allow read: if staff() || (signedIn() && !setupDone());
+      allow write: if admin();
+      allow create: if bootstrapping() && (id == 'menu' || (id == 'setup' && request.resource.data.by == uname()));
+    }
+    match /hotelSettings/{id} {
+      allow read: if staff() || (signedIn() && !setupDone());
+      allow write: if admin();
+      allow create: if bootstrapping();
+    }
+
+    match /orders/{id} {
+      allow get: if admin() || (staff() && (resource == null || resource.data.waiterId == uname()));
+      allow list: if admin() || (staff() && resource.data.waiterId == uname());
+      allow create: if staff() && request.resource.data.waiterId == uname()
+        && request.resource.data.status == 'confirmed' && request.resource.data.printCount == 0;
+      allow update: if admin()
+        // waiter adds items to their own open bill
+        || (staff() && resource.data.waiterId == uname() && resource.data.status != 'cancelled'
+            && changes(['items', 'total', 'status']) && request.resource.data.status == 'confirmed')
+        // any staff phone (e.g. the print station) marks a bill as printed
+        || (staff() && resource.data.status != 'cancelled' && changes(['status', 'printCount', 'lastPrintedAt'])
+            && request.resource.data.status == 'billed');
+      allow delete: if admin();
+    }
+    match /dailyStats/{date} {
+      allow read, create, update: if staff();
+      allow delete: if admin();
+    }
+    match /printJobs/{id} { allow read, write: if staff(); }
+    match /printStation/{id} { allow read, write: if staff(); }
+    match /monthlySummaries/{m} { allow read, write: if admin(); }
+    match /backups/{name} {
+      allow read, write: if admin();
+      match /chunks/{i} { allow read, write: if admin(); }
     }
   }
 }

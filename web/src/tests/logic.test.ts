@@ -50,7 +50,8 @@ describe('receipt', () => {
       expect(text).toContain('2 x 130.00');
       expect(text).toMatch(/GRAND TOTAL\s+Rs\.285\.00/);
       expect(text).toContain('Bill No: 261115-007');
-      expect(text).toContain(o.priceCategory === 'ac' ? 'Hall: AC Hall' : 'Hall: Non-AC Hall');
+      expect(text).not.toContain('Hall');
+      expect(text).not.toContain('Ph:'); // phone and hall are not printed
     }
   });
   it('marks provisional bills', () => {
@@ -79,13 +80,14 @@ describe('exports', () => {
     expect(csv.startsWith('﻿')).toBe(true);
     const rows = csv.slice(1).split('\r\n');
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toContain('Order ID,Bill No,Date,Time,Waiter,Table,Hall,Item');
+    expect(rows[0]).toContain('Order ID,Bill No,Date,Time,Waiter,Item');
     expect(rows[2]).toContain(`"'=cmd|""calc"""`);
   });
   it('JSON matches the backup shape', () => {
     const j = JSON.parse(toJson([order], '2026-11-15', '2026-11-15'));
     expect(j).toMatchObject({ hotel: 'Shree Ram Bharose Hindu Hotel', fromDate: '2026-11-15', toDate: '2026-11-15' });
-    expect(j.transactions[0]).toMatchObject({ orderId: 'abc', tableNumber: 'T1', totalAmount: 285, hall: 'Non-AC Hall' });
+    expect(j.transactions[0]).toMatchObject({ orderId: 'abc', totalAmount: 285 });
+    expect(j.transactions[0]).not.toHaveProperty('hall');
     expect(j.transactions[0].items[0]).toEqual({ menuItemId: 'thali-full', name: 'Gujarati Thali – Full', quantity: 2, price: 130, amount: 260, description: '' });
   });
   it('meaningful file names', () => {
@@ -116,4 +118,9 @@ describe('order entry math & filters', () => {
     expect(presetRange('last30', '2026-11-15').from).toBe(addDays('2026-11-15', -29));
   });
   it('formats INR with Indian grouping', () => expect(inr(123456.5)).toBe('₹1,23,456.5'));
+});
+
+import { billNumber } from '../../../functions/src/orders';
+describe('bill number', () => {
+  it('is SEQ-DDMMYYYY-HHMM', () => expect(billNumber(1, '2026-11-15', '14:30:09')).toBe('001-15112026-1430'));
 });

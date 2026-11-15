@@ -12,16 +12,14 @@ Android like a normal app (a PWA), keeps taking orders without internet, and wor
 
 1. [Features](#features)
 2. [Tech stack](#tech-stack)
-3. [Quick start: run the demo](#quick-start-run-the-demo)
-4. [Demo logins and sample data](#demo-logins-and-sample-data)
-5. [Running in development mode](#running-in-development-mode)
-6. [Running the tests](#running-the-tests)
-7. [Testing on a real Android phone](#testing-on-a-real-android-phone)
-8. [Deploying to Firebase (production)](#deploying-to-firebase-production)
-9. [Project structure](#project-structure)
-10. [Configuration](#configuration)
-11. [Troubleshooting](#troubleshooting)
-12. [More documentation](#more-documentation)
+3. [Run it locally](#run-it-locally)
+4. [Running the tests](#running-the-tests)
+5. [Testing on a real Android phone](#testing-on-a-real-android-phone)
+6. [Deploying (free Firebase plan)](#deploying)
+7. [Project structure](#project-structure)
+8. [Configuration](#configuration)
+9. [Troubleshooting](#troubleshooting)
+10. [More documentation](#more-documentation)
 
 ---
 
@@ -138,7 +136,7 @@ A Bluetooth printer accepts **only one connection at a time**, so:
 For the paths the app can't observe (system print, RawBT), it asks "Printed?" instead of claiming success.
 
 ### Check your printer once (5 minutes)
-1. Deploy, or run the demo on a phone (see *Testing on a real Android phone* below), and open it in **Chrome on Android**.
+1. Deploy, or run it locally on a phone (see *Testing on a real Android phone* below), and open it in **Chrome on Android**.
 2. Turn the printer on, and turn on the phone's Bluetooth and Location.
 3. Settings → **Bluetooth printer → Connect printer**.
    - **The printer appears and connects:** it's BLE. Print any bill; the logo and text should print, and the paper
@@ -153,109 +151,22 @@ For the paths the app can't observe (system print, RawBT), it asks "Printed?" in
 
 ---
 
-## Quick start: run the demo
+## Run it locally
 
-The demo runs **entirely on your computer** using the Firebase emulators. It needs no Firebase account or
-credentials.
-
-### Prerequisites
-
-| Tool | Version | Check |
-|---|---|---|
-| Node.js | 22.x | `node -v` |
-| npm | 10+ | `npm -v` |
-| Java JDK | **21+** (the Firestore emulator needs it) | `java -version` |
-| Chrome | latest | for using the app |
-
-### Steps
+Runs entirely on your computer against local copies of Firebase (emulators). No Firebase account needed. Needs Java 21.
 
 ```bash
-# 1. Install dependencies for the root, functions and web projects
 npm run install:all
 
-# 2. Build everything and start the emulators with the demo project
-npm run demo
+# Terminal 1: local Firebase Authentication + Firestore (empty on every start)
+npx firebase emulators:start --project demo-srbh --only auth,firestore
+
+# Terminal 2: the app with hot reload, connected to the emulators (settings in web/.env.emulator)
+npm --prefix web run dev -- --mode emulator --port 5000
 ```
 
-Wait for **"All emulators ready!"**, then open:
-
-| URL | What |
-|---|---|
-| <http://localhost:5000> | **The app** |
-| <http://127.0.0.1:4000> | Emulator UI (browse the Firestore data, Storage backups and logs) |
-
-On the login page, tap **Demo as Admin** or **Demo as Waiter**.
-
-> Stop the demo with `Ctrl + C`. The emulator database is in memory, so each restart begins with fresh demo data.
-
----
-
-## Demo logins and sample data
-
-Demo data is created automatically the first time you tap a Demo button.
-
-| Username | Password | Role |
-|---|---|---|
-| `admin` | `Admin@123` | Admin (owner) |
-| `ramesh` | `Waiter@123` | Waiter |
-| `suresh` | `Waiter@123` | Waiter |
-
-Sample data:
-
-| What | Details |
-|---|---|
-| Halls | **Non-AC Hall** and **AC Hall** (prices differ by hall) |
-| Gujarati | Thali Full (₹130 / AC ₹150), Thali Small (₹50 / AC ₹60) |
-| Punjabi | Punjabi Thali (₹160 / AC ₹180) |
-| Dal Bati | Dal Bati Churma (₹120 / AC ₹140) |
-| Beverages | Water Bottle (₹20), Cold Drink (₹40 / AC ₹45) |
-| Chinese | **Disabled**, to show that waiters can't see hidden categories |
-| Extras | Extra (custom amount) |
-| Orders | About 2 months of sample orders. On the Dashboard, pick **Last 7 days** or **Last 30 days**. |
-
-To see the monthly roll-up, go to **Settings → Monthly retention (automatic) → Run now**, then open **Monthly History**.
-
-> These users, passwords and Demo buttons exist **only** in the local demo. The demo login needs both
-> `DEMO_MODE=true` and a project id starting with `demo-`, so it can never switch on in production.
-
-### Demo on the live site (Netlify / Firebase)
-On a deployed site, **Demo as Admin** and **Demo as Waiter** start an **in-browser demo**. Sample menu, tables and
-orders are kept only in that browser, and **nothing is read from or written to the real database**. A green banner
-shows *"Demo mode — sample data, stays in this browser only"* with an **Exit demo** button. Real username + password
-logins always use the real database. (The shared print station is not available in the demo; direct Bluetooth,
-PDF and share are.)
-
-### Suggested walkthrough
-
-1. **Demo as Waiter** → **＋ New order** → **Non-AC Hall** → add 2 × Gujarati Thali Full → **Add Extra** ₹25 →
-   **Review order** → **Confirm**. The bill opens.
-2. On the bill, try **Download PDF**, **Share bill** or **Print (Android)**. With a BLE printer, tap
-   **Connect printer** and then **Print (Bluetooth)**.
-3. Start another order in the **AC Hall** and notice the AC prices.
-4. Switch the language (top right) to ગુજરાતી or हिन्दी.
-5. **Logout** → **Demo as Admin** → explore the Dashboard, Menu (switch **Chinese** on), Users,
-   Export Reports and Settings.
-6. To try offline mode, open Chrome DevTools → Network → **Offline**, take an order, then go back online and
-   watch it sync.
-
----
-
-## Running in development mode
-
-Hot reload for the frontend, with the backend running in the emulators:
-
-```bash
-# Terminal 1: backend emulators (rebuild functions after backend changes)
-npm --prefix functions run build
-npx firebase emulators:start --project demo-srbh
-
-# Terminal 2: Vite dev server with hot reload (proxies /api to the functions emulator)
-npm --prefix web run dev
-```
-
-Open the URL Vite prints (usually <http://localhost:5173>).
-
-> To make backend changes take effect, run `npm --prefix functions run build` again. The emulator reloads the function automatically.
+Open <http://localhost:5000>. On the empty database the login page shows **First-time setup**: create the owner
+account, then add waiters under **Users**. Emulator data lives in memory, so it's gone when you stop Terminal 1.
 
 ---
 
@@ -266,10 +177,10 @@ All commands run from the repo root.
 | Command | What it runs | Needs |
 |---|---|---|
 | `npm run test:unit` | Backend + web unit tests (Vitest) | — |
-| `npm run test:emulators` | API integration tests against the real Firestore and Storage emulators | Java 21 |
-| `npm run test:e2e` | Playwright end-to-end tests in an Android Chrome profile against all emulators | Java 21, `npx playwright install chromium` (inside `web/`) |
+| `npm run test:free` | The real app in Chromium against the Auth + Firestore emulators, plus direct attacks on `firestore.rules` | Java 21, `npx playwright install chromium` (inside `web/`) |
 
-Latest results: **23 backend unit, 25 integration, 27 web unit, 14 end-to-end and 3 visual tests, all passing.**
+Latest results: **23 backend unit, 28 web unit and the free-plan end-to-end check, all passing.** The older
+`test:emulators` / `test:e2e` suites target the previous Cloud Functions server and are out of date.
 See [docs/REPORT.md](docs/REPORT.md) for details.
 
 ---
@@ -283,40 +194,22 @@ over USB:
 adb reverse tcp:5000 tcp:5000
 ```
 
-Then open `http://localhost:5000` in Chrome on the phone and use ⋮ → **Install app** to add it to the home screen.
+Start the app as in *Run it locally*, then open `http://localhost:5000` in Chrome on the phone and use ⋮ → **Install app** to add it to the home screen.
 
 ---
 
 ## Deploying
 
-**Temporary: Netlify** (frontend + API function on Netlify, database on Firestore's free Spark plan), then
-**production: Firebase**. It's the same code, and there's no data migration. Step-by-step guide:
-**[docs/DEPLOY.md](docs/DEPLOY.md)**.
+The app runs on Firebase's **free Spark plan**: Firebase Hosting + Firestore + Firebase Authentication
+(username + password only; no Google sign-in, no Cloud Functions, no Netlify). Full step-by-step guide:
+**[docs/DEPLOY.md](docs/DEPLOY.md)**. Short version:
 
-### Firebase (production), short version
+1. Create a Firebase project (Spark plan). Turn on **Authentication → Email/Password** and create **Firestore** (`asia-south1`).
+2. Register a web app and copy its config into `web/.env.local` (see `web/.env.example`).
+3. `npx firebase login`, `npx firebase use --add`, then `npm run deploy`.
+4. Open `https://<project-id>.web.app`: the first screen asks you to create the owner account.
 
-Short version (full guide in [docs/OPERATIONS.md](docs/OPERATIONS.md)):
-
-1. Create a Firebase project on the **Blaze** plan. Enable **Firestore** (location `asia-south1`) and **Storage**.
-2. Log in and select the project, then set the bootstrap secret:
-   ```bash
-   npx firebase login
-   npx firebase use --add
-   npx firebase functions:secrets:set BOOTSTRAP_TOKEN   # a random value of 32+ characters
-   ```
-3. Deploy:
-   ```bash
-   npm run deploy
-   ```
-4. Create the first admin **once** (this only works while no admin exists):
-   ```bash
-   curl -X POST https://<project-id>.web.app/api/bootstrap \
-     -H "Content-Type: application/json" \
-     -d '{"secret":"<BOOTSTRAP_TOKEN>","username":"owner","displayName":"Owner","password":"<strong password>"}'
-   ```
-5. Log in as `owner`, set the real prices, then add the waiters, tables and printer settings.
-
-> **Current status:** the app is not deployed yet. It has only run against the local demo project.
+Check everything locally first: `npm run test:free` (Auth + Firestore emulators + the real app in Chromium).
 
 ---
 
@@ -325,7 +218,7 @@ Short version (full guide in [docs/OPERATIONS.md](docs/OPERATIONS.md)):
 ```
 .
 ├── README.md                    ← you are here
-├── package.json                 root scripts (demo, tests, deploy) + firebase-tools
+├── package.json                 root scripts (local, tests, deploy) + firebase-tools
 ├── firebase.json                hosting, functions, emulators, security headers
 ├── .firebaserc                  default project = demo-srbh (local demo)
 ├── firestore.rules              deny-all (all access goes through Cloud Functions)
@@ -372,14 +265,13 @@ Short version (full guide in [docs/OPERATIONS.md](docs/OPERATIONS.md)):
 | Setting | Where | Notes |
 |---|---|---|
 | Firebase project | `.firebaserc` | `demo-srbh` = local demo. Add your real project with `firebase use --add`. |
-| `BOOTSTRAP_TOKEN` | Secret Manager (prod); `functions/.secret.local` (emulator) | Used once to create the first admin, or to recover the admin. Keep it private. |
-| `DEMO_MODE` | `functions/.env.demo-srbh` | Turns on the Demo buttons. Only works with `demo-*` project ids. |
-| Region | `functions/src/index.ts`, `firebase.json` | `asia-south1` (Mumbai) |
-| Session length | `functions/src/security.ts` | 12 hours |
+| Firebase web config | `web/.env.local` (copy `web/.env.example`) | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`. Not secrets. |
+| Security | `firestore.rules` | Who can read/write what. Deployed with `npm run deploy` (or `npm run deploy:rules`). |
 | Hotel name, address, GSTIN, bill footer, paper width | In the app: **Settings → Hotel details** | Printed on bills |
 | Prices and categories (AC / Non-AC prices) | In the app: **Menu** | — |
 
-The frontend needs **no** environment variables or Firebase keys. It only calls `/api` on its own domain.
+The browser talks to Firestore directly (`web/src/services/firebaseBackend.ts`). The `functions/` folder is the
+older Cloud Functions server for the paid Blaze plan; it isn't deployed on the free plan, but the web app reuses its pricing and report logic.
 
 ---
 
@@ -390,7 +282,7 @@ The frontend needs **no** environment variables or Firebase keys. It only calls 
 | `Could not start Firestore Emulator` or a Java error | Install JDK 21+ and set `JAVA_HOME` to it. Check with `java -version`. |
 | Port 5000, 5001, 8080, 9199 or 4000 already in use | Stop the other process, or change the ports in `firebase.json` → `emulators`. |
 | Demo buttons don't appear | Make sure you started with `--project demo-srbh` (`npm run demo` does this). |
-| "Too many attempts" on login | The login rate limit (30 per 15 min per device) or a 5-failure lockout. Wait 15 minutes, or restart the demo. |
+| "Too many attempts" on login | Firebase Authentication paused logins after repeated wrong passwords. Wait a few minutes and try again. |
 | Printer doesn't appear in the list | Turn on phone Bluetooth **and Location**. If it's a classic-Bluetooth printer, use **Print via RawBT app**. |
 | Changes don't appear after a rebuild | The service worker cached the old version. Reload twice, or clear the site data in DevTools. |
 | `ENOSPC` / disk full while installing | Free some disk space, or move the npm cache (`npm config set cache <other-drive>`). |
@@ -399,6 +291,8 @@ The frontend needs **no** environment variables or Firebase keys. It only calls 
 
 ## More documentation
 
+- [COMMANDS.md](COMMANDS.md): everyday commands (commit, deploy, test, run locally, roll back)
+- [docs/DEPLOY.md](docs/DEPLOY.md): free-plan Firebase setup, env values, owner password recovery
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): architecture, database collections, login and security design, offline sync, monthly retention, printing, languages
 - [docs/OPERATIONS.md](docs/OPERATIONS.md): Firebase setup and deployment, first admin, managing waiters, Android install, Bluetooth printer setup, menu and halls, reports and backups
 - [docs/REPORT.md](docs/REPORT.md): test results, security checklist, deployment status, known limitations

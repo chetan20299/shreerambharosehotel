@@ -14,7 +14,6 @@ export default function UsersPage() {
   const { toast, confirm, errorText } = useUi();
   const { data, loading, error, reload } = useApi<User[]>('/users');
   const [form, setForm] = useState<Form | null>(null);
-  const [link, setLink] = useState<{ name: string; url: string } | null>(null);
 
   const valid = form && form.displayName.trim() && (form.id || /^[a-z0-9._-]{3,32}$/.test(form.username)) && (form.id ? !form.password || form.password.length >= 8 : form.password.length >= 8);
   const save = async () => {
@@ -29,15 +28,6 @@ export default function UsersPage() {
     if (u.active && !(await confirm({ title: t('users.disable'), message: t('users.disableConfirm', { name: u.displayName }), danger: true, confirmText: t('users.disable') }))) return;
     try { await api(`/users/${u.id}`, { method: 'PATCH', body: { active: !u.active } }); void reload(true); } catch (e) { toast(errorText(e), 'error'); }
   };
-  const resetLink = async (u: User) => {
-    try {
-      const r = await api<{ token: string }>(`/users/${u.id}/reset-link`, { method: 'POST' });
-      setLink({ name: u.displayName, url: `${location.origin}/reset-password#${r.token}` });
-    } catch (e) { toast(errorText(e), 'error'); }
-  };
-  const copy = async () => { try { await navigator.clipboard.writeText(link!.url); toast(t('users.copied'), 'success'); } catch { /* select manually */ } };
-  const share = async () => { try { await navigator.share({ title: t('users.resetTitle'), text: link!.url }); } catch { /* cancelled or unsupported */ } };
-
   return (
     <div>
       <PageHeader title={t('users.title')} actions={<button className="btn-primary" onClick={() => setForm({ username: '', displayName: '', password: '', role: 'waiter' })} data-testid="add-user">+ {t('users.add')}</button>} />
@@ -50,7 +40,6 @@ export default function UsersPage() {
                 <div className="text-sm text-muted">@{u.username} · {u.role === 'admin' ? t('users.admin') : t('users.waiter')} · {t('users.lastLogin')}: {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('en-IN') : t('users.never')}</div>
               </div>
               <button className="btn-ghost !min-h-10" onClick={() => setForm({ id: u.id, username: u.username, displayName: u.displayName, password: '', role: u.role })}>{t('common.edit')}</button>
-              <button className="btn-ghost !min-h-10" onClick={() => resetLink(u)}>🔑 {t('users.resetLink')}</button>
               {u.id !== me?.id && <button className={`btn-ghost !min-h-10 ${u.active ? 'text-error' : 'text-success'}`} onClick={() => setActive(u)}>{u.active ? t('users.disable') : t('users.enable')}</button>}
             </div>
           ))}
@@ -73,10 +62,6 @@ export default function UsersPage() {
         </>}
       </Modal>
 
-      <Modal open={!!link} onClose={() => setLink(null)} title={t('users.resetTitle')}
-        footer={<>{'share' in navigator && <button className="btn-ghost" onClick={share}>📤 {t('reports.share')}</button>}<button className="btn-primary" onClick={copy}>📋 {t('users.copy')}</button></>}>
-        {link && <><p className="mb-2">{t('users.resetHelp', { name: link.name })}</p><textarea readOnly className="input font-mono text-xs h-24 py-2" value={link.url} onFocus={(e) => e.target.select()} /></>}
-      </Modal>
     </div>
   );
 }

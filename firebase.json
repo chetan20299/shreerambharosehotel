@@ -19,7 +19,6 @@
     "public": "web/dist",
     "ignore": ["firebase.json", "**/.*"],
     "rewrites": [
-      { "source": "/api/**", "function": { "functionId": "api", "region": "asia-south1" } },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [
@@ -31,7 +30,7 @@
           { "key": "Referrer-Policy", "value": "same-origin" },
           { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
           { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
-          { "key": "Content-Security-Policy", "value": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" }
+          { "key": "Content-Security-Policy", "value": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" }
         ]
       },
       { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
@@ -41,6 +40,7 @@
   },
   "emulators": {
     "functions": { "port": 5001 },
+    "auth": { "port": 9099 },
     "firestore": { "port": 8080 },
     "storage": { "port": 9199 },
     "hosting": { "port": 5000 },

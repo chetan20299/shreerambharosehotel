@@ -76,3 +76,25 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   #print-area { position: absolute; inset: 0 auto auto 0; width: 100%; }
   @page { margin: 4mm; }
 }
+
+/* Action overlay animations (ActionOverlay.tsx) */
+@keyframes ov-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ov-plate { to { transform: rotate(360deg); } }
+@keyframes ov-drop { 0% { transform: translateY(-40px); opacity: 0; } 30% { transform: translateY(0); opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes ov-paper { 0% { transform: translateY(0); } 85%, 100% { transform: translateY(46px); } }
+@keyframes ov-blink { 50% { opacity: .2; } }
+@keyframes ov-pop { 0% { transform: scale(0); } 70% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes ov-check { to { stroke-dashoffset: 0; } }
+@keyframes ov-dot { 0%, 80%, 100% { transform: scale(.5); opacity: .4; } 40% { transform: scale(1); opacity: 1; } }
+.anim-fade { animation: ov-fade .18s ease-out; }
+.anim-plate { transform-origin: 60px 68px; animation: ov-plate 3s linear infinite; }
+.anim-drop { animation: ov-drop 1.6s ease-out infinite both; }
+.anim-paper { animation: ov-paper 1.4s ease-in-out infinite; }
+.anim-blink { animation: ov-blink .5s steps(2) infinite; }
+.anim-pop { transform-origin: 60px 60px; animation: ov-pop .35s ease-out both; }
+.anim-check { stroke-dasharray: 80; stroke-dashoffset: 80; animation: ov-check .35s .25s ease-out forwards; }
+.anim-dot { animation: ov-dot 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-plate, .anim-drop, .anim-paper, .anim-blink, .anim-dot { animation: none; }
+  .anim-check { stroke-dashoffset: 0; animation: none; }
+}

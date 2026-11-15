@@ -28,6 +28,21 @@ const MAX_PRICE = 100_000;
 const isTwoDecimals = (n: number) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6;
 
 /** Server-authoritative pricing. Money math in integer paise. Snapshots name/price at order time. */
+/** Bill number: SEQ-DDMMYYYY-HHMM, e.g. 001-15112026-1430 (seq restarts every day). */
+export const billNumber = (seq: number, date: string, time: string) =>
+  `${String(seq).padStart(3, '0')}-${date.slice(8, 10)}${date.slice(5, 7)}${date.slice(0, 4)}-${time.slice(0, 2)}${time.slice(3, 5)}`;
+
+/** Adds new lines into existing ones (same item + price + note → quantities add up). */
+export function mergeItems(a: OrderItem[], b: OrderItem[]) {
+  const out = a.map((i) => ({ ...i }));
+  for (const n of b) {
+    const same = n.type === 'fixed' && out.find((i) => i.menuItemId === n.menuItemId && i.unitPrice === n.unitPrice && i.description === n.description);
+    if (same) { same.quantity += n.quantity; same.amount = Math.round(same.unitPrice * 100) * same.quantity / 100; }
+    else out.push(n);
+  }
+  return { items: out, total: out.reduce((s, i) => s + Math.round(i.amount * 100), 0) / 100 };
+}
+
 export function buildItems(lines: LineInput[], menu: Map<string, MenuItem>, category: PriceCategory = 'nonac') {
   if (!lines.length) throw new HttpError(400, 'Order has no items');
   let totalP = 0;
@@ -109,3 +124,42 @@ export const toExportJson = (orders: Order[], fromDate: string, toDate: string) 
     totalAmount: o.total,
   })),
 });
+
+// ---- summary merging (dashboard per-day totals, monthly roll-up) ----
+type Summary = ReturnType<typeof summarize>;
+type Row = { amount: number } & Record<string, unknown>;
+export function addMonths(month: string, n: number) {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return d.toISOString().slice(0, 7);
+}
+
+function mergeRows<T extends Row>(a: T[], b: T[], key: keyof T, counters: (keyof T)[]): T[] {
+  const m = new Map<unknown, T>(a.map((r) => [r[key], { ...r }]));
+  for (const r of b) {
+    const cur = m.get(r[key]);
+    if (!cur) { m.set(r[key], { ...r }); continue; }
+    for (const c of counters) (cur[c] as number) = Math.round(((cur[c] as number) + (r[c] as number)) * 100) / 100;
+  }
+  return [...m.values()];
+}
+
+/** Adds summary `b` into `a` (both shaped like summarize()). Exported for tests. */
+export function mergeSummaries(a: Summary | undefined, b: Summary): Summary {
+  if (!a) return b;
+  const r2 = (x: number) => Math.round(x * 100) / 100;
+  return {
+    orderCount: a.orderCount + b.orderCount,
+    cancelledCount: a.cancelledCount + b.cancelledCount,
+    totalAmount: r2(a.totalAmount + b.totalAmount),
+    thaliCount: a.thaliCount + b.thaliCount,
+    extraAmount: r2(a.extraAmount + b.extraAmount),
+    byItem: mergeRows(a.byItem, b.byItem, 'menuItemId', ['quantity', 'amount']).sort((x, y) => y.amount - x.amount),
+    byDay: mergeRows(a.byDay, b.byDay, 'key', ['orders', 'amount']).sort((x, y) => x.key.localeCompare(y.key)),
+    byWaiter: mergeRows(a.byWaiter, b.byWaiter, 'key', ['orders', 'amount']).sort((x, y) => y.amount - x.amount),
+    byTable: mergeRows(a.byTable, b.byTable, 'key', ['orders', 'amount']).sort((x, y) => x.label.localeCompare(y.label, undefined, { numeric: true })),
+    byCategory: mergeRows(a.byCategory ?? [], b.byCategory, 'key', ['orders', 'amount']).sort((x, y) => x.key.localeCompare(y.key)),
+    byHour: mergeRows(a.byHour ?? [], b.byHour ?? [], 'key', ['orders', 'amount']).sort((x, y) => x.key.localeCompare(y.key)),
+  };
+}
+

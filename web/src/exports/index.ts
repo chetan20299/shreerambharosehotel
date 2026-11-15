@@ -1,5 +1,5 @@
 import type { Order, Settings, Summary } from '../types';
-import { ascii, receiptLines, HALL } from '../printing/receipt';
+import { ascii, receiptLines } from '../printing/receipt';
 
 // All exported files are English-only, regardless of the UI language.
 export const HOTEL = 'Shree Ram Bharose Hindu Hotel';
@@ -15,9 +15,9 @@ const csvCell = (v: unknown) => {
 
 /** One row per order item (detailed report). Guards against CSV/formula injection. */
 export function toCsv(orders: Order[]) {
-  const head = ['Order ID', 'Bill No', 'Date', 'Time', 'Waiter', 'Table', 'Hall', 'Item', 'Note', 'Quantity', 'Rate', 'Amount', 'Order Total', 'Status'];
+  const head = ['Order ID', 'Bill No', 'Date', 'Time', 'Waiter', 'Item', 'Note', 'Quantity', 'Rate', 'Amount', 'Order Total', 'Status'];
   const rows = orders.flatMap((o) => o.items.map((i) => [
-    o.id, o.billNo, o.date, o.time, o.waiterName, o.tableLabel, HALL[o.priceCategory ?? 'nonac'], i.name, i.description, i.quantity,
+    o.id, o.billNo, o.date, o.time, o.waiterName, i.name, i.description, i.quantity,
     i.unitPrice.toFixed(2), i.amount.toFixed(2), o.total.toFixed(2), o.status,
   ]));
   return '﻿' + [head, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
@@ -27,7 +27,7 @@ export const toJson = (orders: Order[], from: string, to: string) => JSON.string
   hotel: HOTEL, exportDate: new Date().toISOString(), fromDate: from, toDate: to,
   transactions: orders.map((o) => ({
     orderId: o.id, billNo: o.billNo, date: o.date, time: o.time, waiterId: o.waiterId, waiterName: o.waiterName,
-    tableNumber: o.tableLabel, hall: HALL[o.priceCategory ?? 'nonac'], status: o.status, createdAt: o.createdAt,
+    status: o.status, createdAt: o.createdAt,
     items: o.items.map((i) => ({ menuItemId: i.menuItemId, name: i.name, quantity: i.quantity, price: i.unitPrice, amount: i.amount, description: i.description })),
     totalAmount: o.total,
   })),
@@ -54,11 +54,6 @@ export async function reportPdf(orders: Order[], summary: Summary, range: string
     head: [['Total orders', 'Total thalis', 'Extra collection', 'Total collection', 'Cancelled']],
     body: [[summary.orderCount, summary.thaliCount, rs(summary.extraAmount), rs(summary.totalAmount), summary.cancelledCount]],
   });
-  if (summary.byCategory?.length) autoTable(doc, {
-    theme: 'striped', headStyles: { fillColor: [226, 166, 43], textColor: [43, 29, 20] },
-    head: [['Hall-wise sales', 'Orders', 'Amount']],
-    body: summary.byCategory.map((c) => [c.label, c.orders, rs(c.amount)]),
-  });
   autoTable(doc, {
     theme: 'striped', headStyles: { fillColor: [31, 95, 74] },
     head: [['Item-wise summary', 'Quantity', 'Amount']],
@@ -68,13 +63,13 @@ export async function reportPdf(orders: Order[], summary: Summary, range: string
   });
   autoTable(doc, {
     theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [43, 29, 20] },
-    head: [['Bill No', 'Date', 'Time', 'Waiter', 'Table', 'Item', 'Qty', 'Rate', 'Amount', 'Total', 'Status']],
+    head: [['Bill No', 'Date', 'Time', 'Waiter', 'Item', 'Qty', 'Rate', 'Amount', 'Total', 'Status']],
     body: orders.flatMap((o) => o.items.map((i, k) => [
-      k ? '' : o.billNo, k ? '' : o.date, k ? '' : o.time.slice(0, 5), k ? '' : ascii(o.waiterName), k ? '' : ascii(o.tableLabel),
+      k ? '' : o.billNo, k ? '' : o.date, k ? '' : o.time.slice(0, 5), k ? '' : ascii(o.waiterName),
       ascii(i.name + (i.description ? ` (${i.description})` : '')), i.quantity, i.unitPrice.toFixed(2), i.amount.toFixed(2),
       k ? '' : o.total.toFixed(2), k ? '' : o.status,
     ])),
-    foot: [['', '', '', '', '', '', '', '', 'Total', summary.totalAmount.toFixed(2), '']],
+    foot: [['', '', '', '', '', '', '', 'Total', summary.totalAmount.toFixed(2), '']],
   });
   const pages = doc.getNumberOfPages();
   for (let p = 1; p <= pages; p++) doc.setPage(p).setFontSize(8).text(`Page ${p} of ${pages}`, 196, 290, { align: 'right' });

@@ -1,56 +1,34 @@
-import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n';
 import { useApi } from '../hooks';
-import { api } from '../services/api';
 import { Loader } from '../components/Brand';
 import { BillView } from '../components/BillView';
-import { Field, Modal, useUi } from '../components/ui';
+import { useUi } from '../components/ui';
 import { inr } from '../utils/format';
 import type { Order } from '../types';
 
 export function BillPage() {
   const { id = '' } = useParams();
-  const { user } = useAuth();
   const { t } = useI18n();
-  const { toast, errorText } = useUi();
+  const { errorText } = useUi();
   const nav = useNavigate();
   const { data: order, loading, error, reload } = useApi<Order>(`/orders/${id}`);
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [reason, setReason] = useState('');
 
   if (loading && !order) return <Loader label={t('loader.loading')} />;
   if (error || !order) return <div className="card p-6 text-center"><p className="mb-3">{error ? errorText(error) : t('bill.notFound')}</p><button className="btn-ghost" onClick={() => nav(-1)}>{t('common.back')}</button></div>;
 
-  const cancel = async () => {
-    try { await api(`/orders/${order.id}/cancel`, { method: 'POST', body: { reason } }); setCancelOpen(false); void reload(); }
-    catch (e) { toast(errorText(e), 'error'); }
-  };
-
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <div className="flex items-center gap-2">
-          <button className="btn-ghost !px-3" onClick={() => nav(-1)} aria-label={t('common.back')}>←</button>
-          <div>
-            <h1 className="text-2xl font-bold">{t('bill.title')} #{order.billNo}</h1>
-            <div className="text-sm text-muted">{order.tableId ? `${t('common.table')} ${order.tableLabel}` : order.tableLabel} · {order.waiterName} · {inr(order.total)}
-              {order.printCount ? ` · ${t('bill.printed', { n: order.printCount })}` : ''}</div>
-            {order.conflict && <div className="text-sm font-semibold text-warning">⚠️ {t('orders.conflict')}</div>}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button className="btn-secondary" onClick={() => nav('/new')} data-testid="bill-new-order">＋ {t('tables.newOrder')}</button>
-          {user?.role === 'admin' && order.status !== 'cancelled' && <button className="btn-ghost text-error" onClick={() => setCancelOpen(true)}>{t('bill.cancelOrder')}</button>}
-        </div>
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold">{t('bill.title')} #{order.billNo}</h1>
+        <div className="text-sm text-muted">{order.waiterName} · {inr(order.total)}{order.printCount ? ` · ${t('bill.printed', { n: order.printCount })}` : ''}</div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <button className="btn-ghost bg-white" disabled={order.status === 'cancelled'} data-testid="bill-add-item"
+          onClick={() => nav(`/new?add=${order.id}&bill=${encodeURIComponent(order.billNo)}`)}>＋ {t('bill.addItem')}</button>
+        <button className="btn-ghost bg-white" onClick={() => nav('/new')} data-testid="bill-cancel-print">✕ {t('bill.cancelPrint')}</button>
       </div>
       <BillView order={order} onPrinted={() => void reload(true)} />
-      <Modal open={cancelOpen} onClose={() => setCancelOpen(false)} title={t('bill.cancelOrder')}
-        footer={<><button className="btn-ghost" onClick={() => setCancelOpen(false)}>{t('common.back')}</button>
-          <button className="btn-danger" disabled={reason.trim().length < 3} onClick={cancel}>{t('bill.cancelOrder')}</button></>}>
-        <Field label={t('bill.cancelReason')}><input className="input" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} /></Field>
-      </Modal>
     </div>
   );
 }

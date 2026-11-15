@@ -8,7 +8,7 @@ import {
   hashPassword, verifyPassword, dummyHash, newToken, sha256, safeEqual,
   parseCookies, sessionCookie, SESSION_COOKIE, SESSION_TTL_MS,
 } from './security.js';
-import { HttpError, buildItems, summarize, toExportJson, HOTEL_NAME, CATEGORY_LABEL, type MenuItem, type Order, type PriceCategory } from './orders.js';
+import { HttpError, buildItems, billNumber, mergeItems, summarize, toExportJson, HOTEL_NAME, type MenuItem, type Order, type PriceCategory } from './orders.js';
 import { istParts, istToday, istRange, istToUtc, addDays } from './time.js';
 import { seedBase, seedDemo, DEMO_USERS } from './seed.js';
 import { runMonthlyRollup, mergeSummaries } from './retention.js';
@@ -630,7 +630,6 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
         if (existing.data()!.waiterId !== u.id) throw new HttpError(409, 'Duplicate order id');
         return { order: toOrder(existing), duplicate: true };
       }
-      if (!b.hall && !b.tableId) throw new HttpError(400, 'Choose AC or Non-AC hall');
       // Hall orders don't touch the floor plan at all (3 reads + 2 writes per order).
       const floor = b.tableId ? await readFloor(tx) : null;
       const raw = b.tableId ? floor!.tables[b.tableId] : undefined;
@@ -646,7 +645,8 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
       const md = await readMenu(tx);
       const menu = new Map(Object.entries(md.items).map(([mid, m]) => [mid, { ...m, id: mid, active: m.active && !!md.categories[m.categoryId]?.active } as MenuItem]));
       // Price list follows the table's section: AC hall or Non-AC hall.
-      const priceCategory: PriceCategory = t ? floor!.sections.find((x) => x.id === t.sectionId)?.priceCategory ?? 'nonac' : b.hall!;
+      // One price list now (Non-AC price). `hall`/tables are still accepted from older clients.
+      const priceCategory: PriceCategory = t ? floor!.sections.find((x) => x.id === t.sectionId)?.priceCategory ?? 'nonac' : b.hall ?? 'nonac';
       const { items, total } = buildItems(b.items, menu, priceCategory);
       const serverNow = Date.now();
       const client = b.offline && b.clientCreatedAt ? Date.parse(b.clientCreatedAt) : NaN;
@@ -657,10 +657,10 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
       const dayDoc = (await tx.get(dayRef(date))).data() as (ReturnType<typeof summarize> & { seq?: number }) | undefined;
       const seq = (dayDoc?.seq ?? 0) + 1;
       const statsDoc = dayDoc?.orderCount !== undefined ? dayDoc : undefined;
-      const billNo = `${date.slice(2).replaceAll('-', '')}-${String(seq).padStart(3, '0')}`;
+      const billNo = billNumber(seq, date, time);
       const order = {
         billNo, date, time, waiterId: u.id, waiterName: u.displayName,
-        tableId: b.tableId ?? '', tableLabel: t?.label ?? CATEGORY_LABEL[priceCategory], // hall orders: label = hall name
+        tableId: b.tableId ?? '', tableLabel: t?.label ?? '',
         items, total, status: 'confirmed', printCount: 0, createdAt: Timestamp.fromDate(now),
         offline: !!b.offline, conflict: tableBusy, priceCategory,
       };
@@ -687,6 +687,25 @@ export function createApp(opts: { bootstrapToken: () => string | undefined; demo
     return o;
   }
   r.get('/orders/:id', anyStaff, async (req, res) => { res.json(await loadOrderFor(req)); });
+
+  // Add more items to an existing (not cancelled) order: same bill number, total recalculated on the server.
+  r.post('/orders/:id/items', anyStaff, async (req, res) => {
+    const o = await loadOrderFor(req);
+    const b = parse(CreateOrder.pick({ items: true }), req.body);
+    const ref = ordersCol().doc(o.id);
+    const updated = await db.runTransaction(async (tx) => {
+      const cur = toOrder(await tx.get(ref));
+      if (cur.status === 'cancelled') throw new HttpError(409, 'Order is cancelled');
+      const md = await readMenu(tx);
+      const menu = new Map(Object.entries(md.items).map(([mid, m]) => [mid, { ...m, id: mid, active: m.active && !!md.categories[m.categoryId]?.active } as MenuItem]));
+      const { items, total } = mergeItems(cur.items, buildItems(b.items, menu, cur.priceCategory ?? 'nonac').items);
+      tx.update(ref, { items: items.map(({ description, ...i }) => (description ? { ...i, description } : i)), total, status: 'confirmed' });
+      return { ...cur, items, total, status: 'confirmed' as const };
+    });
+    await recomputeDay(o.date);
+    await audit(me(req), 'order.items_added', { orderId: o.id, billNo: o.billNo, added: b.items.length });
+    res.json(updated);
+  });
 
   async function markPrinted(o: Order) {
     await ordersCol().doc(o.id).update({ status: 'billed', printCount: FieldValue.increment(1), lastPrintedAt: FieldValue.serverTimestamp() });

@@ -9,7 +9,7 @@ import { PrintStationCard } from '../components/PrintStation';
 import { DEFAULT_SETTINGS } from '../components/BillView';
 import { Field, PageHeader, useUi } from '../components/ui';
 import { download, toJson, reportFileName } from '../exports';
-import { addDays, inr, istToday } from '../utils/format';
+import { addDays, addMonths, inr, istToday } from '../utils/format';
 import type { Order, Settings } from '../types';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -109,9 +109,18 @@ function DataManagement() {
   const { t } = useI18n();
   const { toast, confirm, errorText } = useUi();
   const [date, setDate] = useState(addDays(istToday(), -1));
+  const [monthSel, setMonthSel] = useState<'1' | '2' | '3' | 'custom'>('1');
+  const [customMonth, setCustomMonth] = useState(addMonths(istToday().slice(0, 7), -1));
+  /** Last N full months (not the current one), or one chosen month → { from, to } dates. */
+  const monthRange = () => {
+    const cur = istToday().slice(0, 7);
+    const first = monthSel === 'custom' ? customMonth : addMonths(cur, -Number(monthSel));
+    const last = monthSel === 'custom' ? customMonth : addMonths(cur, -1);
+    return { from: `${first}-01`, to: addDays(`${addMonths(last, 1)}-01`, -1) };
+  };
   const [busy, setBusy] = useState(false);
 
-  const run = async (body: { mode: 'range' | 'olderThan'; from?: string; days?: number }, backupRange: { from: string; to: string }) => {
+  const run = async (body: { mode: 'range' | 'olderThan'; from?: string; to?: string; days?: number }, backupRange: { from: string; to: string }) => {
     setBusy(true);
     try {
       const dry = await api<{ count: number; total: number; more: boolean }>('/orders/delete', { method: 'POST', body: { ...body, dryRun: true } });
@@ -121,7 +130,7 @@ function DataManagement() {
         download(new Blob([toJson(r.orders, backupRange.from, backupRange.to)], { type: 'application/json' }), reportFileName('Backup', backupRange.from, backupRange.to, 'json'));
       };
       const ok = await confirm({
-        title: body.mode === 'range' ? t('settings.deleteDate') : t('settings.deleteOlder'), danger: true, confirmText: t('common.delete'), requireText: 'DELETE',
+        title: body.mode === 'range' ? (body.to && body.to !== body.from ? t('settings.deleteMonths') : t('settings.deleteDate')) : t('settings.deleteOlder'), danger: true, confirmText: t('common.delete'), requireText: 'DELETE',
         message: <div className="space-y-3"><p className="font-semibold">{t('settings.affected', { n: dry.count, amount: inr(dry.total) })}</p>
           <button type="button" className="btn-ghost w-full" onClick={backup}>⬇️ {t('settings.backupFirst')}</button></div>,
       });
@@ -133,6 +142,20 @@ function DataManagement() {
 
   return (
     <Section title={t('settings.data')}>
+      <div className="rounded-xl border border-line p-3 mb-3" data-testid="delete-by-month">
+        <div className="font-semibold mb-2">{t('settings.deleteMonths')}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+          {(['1', '2', '3', 'custom'] as const).map((k) => (
+            <button key={k} type="button" aria-pressed={monthSel === k} onClick={() => setMonthSel(k)}
+              className={`chip border justify-center !min-h-11 ${monthSel === k ? 'bg-ink text-white border-ink' : 'bg-white border-line'}`}>
+              {k === 'custom' ? t('settings.customMonth') : t('settings.lastMonths', { n: k })}</button>
+          ))}
+        </div>
+        {monthSel === 'custom' && <input type="month" className="input mb-2" max={addMonths(istToday().slice(0, 7), -1)} value={customMonth} onChange={(e) => setCustomMonth(e.target.value)} aria-label={t('settings.customMonth')} />}
+        <p className="text-xs text-muted mb-2">{monthRange().from} → {monthRange().to}</p>
+        <button className="btn-danger w-full" disabled={busy || (monthSel === 'custom' && !customMonth)}
+          onClick={() => { const r = monthRange(); void run({ mode: 'range', ...r }, r); }} data-testid="delete-months-check">{t('settings.check')}</button>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border border-line p-3">
           <div className="font-semibold mb-2">{t('settings.deleteDate')}</div>
@@ -148,36 +171,23 @@ function DataManagement() {
   );
 }
 
+/** Server backups: JSON copies saved automatically before any deletion and before each monthly roll-up. */
 function Logs() {
   const { t } = useI18n();
-  const [tab, setTab] = useState<'backups' | 'audit' | 'exports'>('backups');
-  const backups = useApi<{ name: string; size: number; created: string }[]>(tab === 'backups' ? '/backups' : null);
-  const audit = useApi<{ id: string; actorName: string; action: string; at: string; details: unknown }[]>(tab === 'audit' ? '/audit' : null);
-  const exportsH = useApi<{ id: string; userName: string; format: string; from: string; to: string; count: number; action: string; at: string }[]>(tab === 'exports' ? '/exports/history' : null);
+  const backups = useApi<{ name: string; size: number; created: string }[]>('/backups');
   const fetchBackup = async (name: string) => {
     const blob = await api<Blob>(`/backups/${encodeURIComponent(name)}`);
     download(blob instanceof Blob ? blob : new Blob([JSON.stringify(blob, null, 2)], { type: 'application/json' }), name);
   };
   const when = (s?: string) => (s ? new Date(s).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '');
   return (
-    <Section title={`${t('settings.backups')} · ${t('settings.audit')}`}>
-      <div className="flex flex-wrap gap-2 mb-3">
-        {(['backups', 'audit', 'exports'] as const).map((k) => (
-          <button key={k} onClick={() => setTab(k)} className={`chip border !min-h-10 ${tab === k ? 'bg-ink text-white border-ink' : 'bg-white border-line'}`}>
-            {k === 'backups' ? t('settings.backups') : k === 'audit' ? t('settings.audit') : t('settings.exportHistory')}</button>
-        ))}
-      </div>
+    <Section title={t('settings.backups')}>
       <div className="max-h-96 overflow-y-auto text-sm" lang="en">
-        {tab === 'backups' && (backups.data?.length ? backups.data.map((b) => (
+        {backups.data?.length ? backups.data.map((b) => (
           <div key={b.name} className="flex items-center justify-between gap-2 border-t border-line py-2">
             <span className="min-w-0 break-all">{b.name}<span className="block text-muted">{when(b.created)} · {(b.size / 1024).toFixed(1)} KB</span></span>
-            <button className="btn-ghost !min-h-10" onClick={() => fetchBackup(b.name)}>⬇️</button>
-          </div>)) : <p className="text-muted">{t('common.noData')}</p>)}
-        {tab === 'audit' && (audit.data ?? []).map((a) => (
-          <div key={a.id} className="border-t border-line py-2"><b>{a.action}</b> · {a.actorName} · <span className="text-muted">{when(a.at)}</span>
-            <div className="text-xs text-muted break-all">{JSON.stringify(a.details)}</div></div>))}
-        {tab === 'exports' && (exportsH.data ?? []).map((x) => (
-          <div key={x.id} className="border-t border-line py-2">{x.format.toUpperCase()} {x.action} · {x.userName} · {x.from}→{x.to} · {x.count} · <span className="text-muted">{when(x.at)}</span></div>))}
+            <button className="btn-ghost !min-h-10" onClick={() => fetchBackup(b.name)} aria-label="Download">⬇️</button>
+          </div>)) : <p className="text-muted">{t('common.noData')}</p>}
       </div>
     </Section>
   );

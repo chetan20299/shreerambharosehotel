@@ -103,7 +103,7 @@ describe('orders', () => {
     const r = await call(ramesh, 'post', '/api/orders', body);
     expect(r.status, JSON.stringify(r.body)).toBe(201);
     expect(r.body.order).toMatchObject({ total: 285, tableLabel: 'T1', waiterName: 'Ramesh', status: 'confirmed' });
-    expect(r.body.order.billNo).toMatch(/^\d{6}-001$/);
+    expect(r.body.order.billNo).toMatch(/^001-\d{8}-\d{4}$/); // SEQ-DDMMYYYY-HHMM
     orderId = r.body.order.id;
     const stored = (await db.doc(`orders/${orderId}`).get()).data()!;
     expect(stored.total).toBe(285);
@@ -460,12 +460,22 @@ describe('simple hall flow (no tables)', () => {
     const floorBefore = (await db.doc('floorLayouts/main').get()).data();
     const ac = await call(ramesh, 'post', '/api/orders', { idempotencyKey: randomUUID(), hall: 'ac', items: [{ menuItemId: 'thali-full', quantity: 2 }] });
     expect(ac.status, JSON.stringify(ac.body)).toBe(201);
-    expect(ac.body.order).toMatchObject({ priceCategory: 'ac', tableId: '', tableLabel: 'AC Hall', total: 300 });
+    expect(ac.body.order).toMatchObject({ priceCategory: 'ac', tableId: '', tableLabel: '', total: 300 });
     const non = await call(ramesh, 'post', '/api/orders', { idempotencyKey: randomUUID(), hall: 'nonac', items: [{ menuItemId: 'thali-full', quantity: 2 }] });
-    expect(non.body.order).toMatchObject({ priceCategory: 'nonac', tableLabel: 'Non-AC Hall' });
+    expect(non.body.order).toMatchObject({ priceCategory: 'nonac', tableLabel: '' });
     expect((await call(ramesh, 'post', `/api/orders/${ac.body.order.id}/printed`)).status).toBe(200);
     expect((await call(ramesh, 'get', `/api/orders/${ac.body.order.id}`)).body).toMatchObject({ status: 'billed', printCount: 1 });
     expect((await db.doc('floorLayouts/main').get()).data()).toEqual(floorBefore); // floor plan untouched
-    expect((await call(ramesh, 'post', '/api/orders', { idempotencyKey: randomUUID(), items: [{ menuItemId: 'thali-full', quantity: 1 }] })).status).toBe(400);
+    // no hall/table → single (Non-AC) price list
+    const plain = await call(ramesh, 'post', '/api/orders', { idempotencyKey: randomUUID(), items: [{ menuItemId: 'thali-full', quantity: 1 }] });
+    expect(plain.status).toBe(201);
+    expect(plain.body.order.priceCategory).toBe('nonac');
+    const unit = plain.body.order.total;
+    // add items to the same order: quantities merge, total recalculated, bill number kept
+    const add = await call(ramesh, 'post', `/api/orders/${plain.body.order.id}/items`, { items: [{ menuItemId: 'thali-full', quantity: 2 }, { menuItemId: 'extra', quantity: 1, unitPrice: 15, description: 'Papad' }] });
+    expect(add.status, JSON.stringify(add.body)).toBe(200);
+    expect(add.body).toMatchObject({ billNo: plain.body.order.billNo, total: unit * 3 + 15, status: 'confirmed' });
+    expect(add.body.items.find((i: { menuItemId: string }) => i.menuItemId === 'thali-full').quantity).toBe(3);
+    expect((await call(suresh, 'post', `/api/orders/${plain.body.order.id}/items`, { items: [{ menuItemId: 'thali-full', quantity: 1 }] })).status).toBe(404); // other waiter
   });
 });

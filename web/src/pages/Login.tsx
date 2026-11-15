@@ -8,7 +8,7 @@ import { LanguagePicker } from '../components/LanguagePicker';
 import { Modal, useUi } from '../components/ui';
 
 export function LoginPage() {
-  const { user, loading, login, demo } = useAuth();
+  const { user, loading, login } = useAuth();
   const { t } = useI18n();
   const { errorText } = useUi();
   const [username, setUsername] = useState('');
@@ -17,11 +17,10 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [forgot, setForgot] = useState(false);
-  const [demoOn, setDemoOn] = useState(false);
+  const [setup, setSetup] = useState(false); // no owner account yet → show first-time setup
+  const [name, setName] = useState('');
 
-  // Demo buttons appear only when the backend is running in demo mode (local emulator project).
-  // Local emulator → server-side demo; anywhere else the Demo buttons use the in-browser sample backend.
-  useEffect(() => { api<{ demo: boolean }>('/demo/status', { silent: true }).then((r) => setDemoOn(!!r.demo)).catch(() => setDemoOn(false)); }, []);
+  useEffect(() => { api<{ needed: boolean }>('/setup/status', { silent: true }).then((r) => setSetup(r.needed)).catch(() => setSetup(false)); }, []);
 
   if (loading) return <Loader full label={t('loader.startup')} />;
   if (user) return <Navigate to="/" replace />;
@@ -30,7 +29,13 @@ export function LoginPage() {
     setBusy(true); setError('');
     try { await fn(); } catch (e) { setError(e instanceof ApiError && e.status === 401 ? t('login.invalid') : errorText(e)); } finally { setBusy(false); }
   };
-  const submit = (e: FormEvent) => { e.preventDefault(); void run(() => login(username.trim(), password)); };
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    void run(async () => {
+      if (setup) await api('/bootstrap', { method: 'POST', body: { username: username.trim().toLowerCase(), displayName: name.trim(), password } });
+      await login(username.trim(), password);
+    });
+  };
 
   return (
     <div className="min-h-dvh grid place-items-center p-4 bg-[radial-gradient(circle_at_top,#F6E3D8,transparent_60%)]">
@@ -44,9 +49,11 @@ export function LoginPage() {
         </div>
         <form onSubmit={submit} className="card p-5 space-y-3" noValidate>
           <div>
-            <h1 className="text-xl font-bold">{t('login.welcome')}</h1>
-            <p className="text-muted text-sm">{t('login.subtitle')}</p>
+            <h1 className="text-xl font-bold">{setup ? t('setup.title') : t('login.welcome')}</h1>
+            <p className="text-muted text-sm">{setup ? t('setup.help') : t('login.subtitle')}</p>
           </div>
+          {setup && <label className="block"><span className="label">{t('setup.name')}</span>
+            <input className="input" name="display-name" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} required /></label>}
           <label className="block"><span className="label">{t('login.username')}</span>
             <input className="input" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false}
               value={username} onChange={(e) => setUsername(e.target.value)} required /></label>
@@ -58,20 +65,9 @@ export function LoginPage() {
                 aria-label={show ? t('login.hide') : t('login.show')} aria-pressed={show} onClick={() => setShow(!show)}>{show ? '🙈' : '👁️'}</button>
             </div></label>
           {error && <div role="alert" className="rounded-xl bg-error/10 text-error px-3 py-2 font-semibold">{error}</div>}
-          <button className="btn-primary w-full" disabled={busy || !username || !password}>{t('login.submit')}</button>
+          <button className="btn-primary w-full" disabled={busy || !username || !password || (setup && (!name.trim() || password.length < 8))}>{setup ? t('setup.submit') : t('login.submit')}</button>
           <button type="button" className="w-full text-sm font-semibold text-primary py-2" onClick={() => setForgot(true)}>{t('login.forgot')}</button>
         </form>
-
-        {(
-          <div className="card p-4 mt-4 border-dashed border-accent bg-accent-soft/60" data-testid="demo-card">
-            <div className="font-bold">🧪 {t('login.demoTitle')}</div>
-            <p className="text-sm text-muted mb-3">{demoOn ? t('login.demoNote') : t('login.demoLocalNote')}</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button className="btn-secondary" disabled={busy} onClick={() => run(() => demo('admin', demoOn))}>{t('login.demoAdmin')}</button>
-              <button className="btn-ghost bg-white" disabled={busy} onClick={() => run(() => demo('waiter', demoOn))}>{t('login.demoWaiter')}</button>
-            </div>
-          </div>
-        )}
 
         <div className="mt-4"><LanguagePicker /></div>
       </div>

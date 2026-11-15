@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n';
 import { useApi } from '../hooks';
@@ -7,8 +7,9 @@ import { api, ApiError } from '../services/api';
 import { addPending, toOrderBody } from '../services/offlineQueue';
 import { Loader } from '../components/Brand';
 import { Field, Modal, Spinner, useUi } from '../components/ui';
+import { ActionOverlay, pause } from '../components/ActionOverlay';
 import { inr, uuid } from '../utils/format';
-import { priceFor, type MenuData, type MenuItem, type Order, type PriceCategory } from '../types';
+import type { MenuData, MenuItem, Order } from '../types';
 
 export interface Line { key: string; menuItemId: string; name: string; type: 'fixed' | 'custom'; isThali: boolean; quantity: number; unitPrice: number; description?: string }
 
@@ -21,22 +22,22 @@ export function validExtra(v: string) {
 }
 
 export function OrderEntryPage() {
-  const params = useParams();
-  // The waiter picked the hall on the New order screen: it decides the price list (server applies the same rule).
-  const hall: PriceCategory = params.hall === 'ac' ? 'ac' : 'nonac';
+  // ?add=<orderId>&bill=<billNo>: add items to that existing order instead of creating a new one.
+  const [sp] = useSearchParams();
+  const addTo = sp.get('add');
   const { user } = useAuth();
   const { t } = useI18n();
   const { toast, confirm, errorText } = useUi();
   const nav = useNavigate();
   const menu = useApi<MenuData>('/menu', undefined, { cache: true });
-  const hallName = t(`hall.${hall}`);
   const [catId, setCatId] = useState('');
   const [q, setQ] = useState('');
-  const draftKey = `srbh.draft.${hall}`;
+  const draftKey = addTo ? `srbh.draft.add.${addTo}` : 'srbh.draft';
   const [lines, setLines] = useState<Line[]>(() => { try { return JSON.parse(sessionStorage.getItem(draftKey) ?? '[]'); } catch { return []; } });
   const [extra, setExtra] = useState<{ itemId: string; amount: string; note: string } | null>(null);
   const [review, setReview] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [doneMsg, setDoneMsg] = useState('');
   const idem = useRef(sessionStorage.getItem(`${draftKey}.key`) ?? uuid());
 
 
@@ -59,7 +60,7 @@ export function OrderEntryPage() {
 
   const change = (m: MenuItem, delta: number) => setLines((ls) => {
     const i = ls.findIndex((l) => l.menuItemId === m.id && l.type === 'fixed');
-    if (i < 0) return delta > 0 ? [...ls, { key: m.id, menuItemId: m.id, name: m.name, type: 'fixed', isThali: m.isThali, quantity: 1, unitPrice: priceFor(m, hall) }] : ls;
+    if (i < 0) return delta > 0 ? [...ls, { key: m.id, menuItemId: m.id, name: m.name, type: 'fixed', isThali: m.isThali, quantity: 1, unitPrice: m.price }] : ls;
     const q = Math.min(500, ls[i]!.quantity + delta);
     return q <= 0 ? ls.filter((_, k) => k !== i) : ls.map((l, k) => (k === i ? { ...l, quantity: q } : l));
   });
@@ -78,12 +79,18 @@ export function OrderEntryPage() {
   const submit = async () => {
     setSaving(true);
     try {
-      const r = await api<{ order: Order }>('/orders', { method: 'POST', body: toOrderBody({ idempotencyKey: idem.current, hall, items: lines }) });
-      toast(t('order.saved', { bill: r.order.billNo }), 'success');
+      if (addTo) {
+        await api<Order>(`/orders/${addTo}/items`, { method: 'POST', body: { items: toOrderBody({ idempotencyKey: idem.current, items: lines }).items } });
+        setDoneMsg(t('anim.itemsAdded')); await pause(900);
+        finish(`/orders/${addTo}`);
+        return;
+      }
+      const r = await api<{ order: Order }>('/orders', { method: 'POST', body: toOrderBody({ idempotencyKey: idem.current, items: lines }) });
+      setDoneMsg(t('anim.orderDone', { bill: r.order.billNo })); await pause(900);
       finish(`/orders/${r.order.id}`);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 0) {
-        addPending({ idempotencyKey: idem.current, waiterId: user!.id, waiterName: user!.displayName, hall, tableId: '', tableLabel: hallName, createdAt: new Date().toISOString(), items: lines, total });
+      if (e instanceof ApiError && e.status === 0 && !addTo) {
+        addPending({ idempotencyKey: idem.current, waiterId: user!.id, waiterName: user!.displayName, tableId: '', tableLabel: '', createdAt: new Date().toISOString(), items: lines, total });
         toast(t('order.savedOffline'), 'info');
         finish('/orders');
       } else { toast(errorText(e), 'error'); setReview(false); }
@@ -92,19 +99,17 @@ export function OrderEntryPage() {
   const leave = async () => {
     if (lines.length && !(await confirm({ title: t('order.leaveConfirm'), danger: true, confirmText: t('common.back') }))) return;
     sessionStorage.removeItem(draftKey); sessionStorage.removeItem(`${draftKey}.key`);
-    nav('/new');
+    nav(addTo ? `/orders/${addTo}` : '/orders');
   };
 
   if (menu.loading && !menu.data) return <Loader label={t('loader.menu')} />;
   if (menu.error && !menu.data) return <div className="card p-6 text-center"><p className="mb-3">{errorText(menu.error)}</p><button className="btn-primary" onClick={() => menu.reload()}>{t('common.retry')}</button></div>;
 
   return (
-    <div className="pb-36">
+    <div className="pb-28 md:pb-36">
       <div className="flex items-center gap-2 mb-4">
         <button className="btn-ghost !px-3" onClick={leave} aria-label={t('common.back')}>←</button>
-        <h1 className="text-2xl font-bold">{t('order.title', { table: hallName })}</h1>
-        <span className={`chip ml-auto ${hall === 'ac' ? 'bg-[#DCEAF7] text-[#1D4E89]' : 'bg-accent-soft text-primary-dark'}`} data-testid="hall-chip">
-          {hall === 'ac' ? '❄️' : '🌀'} {t('order.priceList', { hall: t(`hall.${hall}`) })}</span>
+        <h1 className="text-2xl font-bold">{addTo ? `${t('bill.addItem')} · #${sp.get('bill') ?? ''}` : t('tables.newOrder')}</h1>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-1 px-1" role="tablist">
@@ -125,7 +130,7 @@ export function OrderEntryPage() {
           <div key={m.id} className="card p-4 flex items-center gap-3" data-testid={`menu-${m.id}`}>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-lg">{m.name}</div>
-              <div className="text-primary font-bold text-lg tabular-nums">{inr(priceFor(m, hall))}</div>
+              <div className="text-primary font-bold text-lg tabular-nums">{inr(m.price)}</div>
               {m.description && <div className="text-sm text-muted">{m.description}</div>}
             </div>
             <div className="flex items-center gap-2">
@@ -154,7 +159,7 @@ export function OrderEntryPage() {
         </div>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 md:left-[var(--sidebar-w)] z-20 border-t border-line bg-card/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(43,29,20,.08)]">
+      <div className="fixed inset-x-3 md:inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] md:bottom-0 md:left-[var(--sidebar-w)] z-20 rounded-2xl md:rounded-none border border-line md:border-x-0 md:border-b-0 bg-card/95 backdrop-blur p-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(43,29,20,.08)]">
         <div className="mx-auto max-w-6xl flex items-center gap-3">
           <div className="flex-1 min-w-0">
             <div className="text-sm text-muted">{lines.length ? t('order.itemsCount', { n: lines.reduce((s, l) => s + l.quantity, 0) }) : t('order.empty')}</div>
@@ -178,7 +183,7 @@ export function OrderEntryPage() {
         </>}
       </Modal>
 
-      <Modal open={review} onClose={() => !saving && setReview(false)} title={t('order.confirmTitle', { table: hallName })}
+      <Modal open={review} onClose={() => !saving && setReview(false)} title={t('order.review')}
         footer={<><button className="btn-ghost" disabled={saving} onClick={() => setReview(false)}>{t('common.back')}</button>
           <button className="btn-primary" disabled={saving} onClick={submit} data-testid="confirm-order">{saving ? <><Spinner /> {t('order.saving')}</> : `✓ ${t('order.confirm')}`}</button></>}>
         <table className="w-full text-sm">
@@ -190,8 +195,8 @@ export function OrderEntryPage() {
           ))}</tbody>
           <tfoot><tr><td className="td font-bold" colSpan={3}>{t('bill.grandTotal')}</td><td className="td text-right font-bold text-lg tabular-nums">{inr(total)}</td></tr></tfoot>
         </table>
-        {saving && <Loader label={t('order.saving')} />}
       </Modal>
+      <ActionOverlay kind={doneMsg ? 'done' : saving ? 'saving' : null} label={doneMsg || (addTo ? t('anim.addingItems') : t('anim.placing'))} />
     </div>
   );
 }

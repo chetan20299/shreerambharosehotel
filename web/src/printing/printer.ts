@@ -116,13 +116,35 @@ async function reconnect(attempts = 3) {
 }
 
 /** On app start: silently reconnect to the last printer if Chrome remembers the permission (getDevices). */
+/**
+ * Auto-reconnect to the last printer without the device picker:
+ *  - same app session: reuses the remembered device;
+ *  - after an app restart: Chrome's getDevices() returns printers this site was allowed before.
+ * Returns true when the printer is connected.
+ */
 export async function restorePrinter() {
-  if (!bluetoothSupported() || !navigator.bluetooth.getDevices || device) return;
+  if (!bluetoothSupported()) return false;
+  if (device?.gatt?.connected && characteristic) return true;
+  if (device) { await reconnect(2); return !!device.gatt?.connected; }
+  if (!navigator.bluetooth.getDevices) return false;
   try {
     const id = localStorage.getItem(LAST_DEVICE);
     const d = (await navigator.bluetooth.getDevices()).find((x) => x.id === id);
-    if (d) { device = d; d.addEventListener('gattserverdisconnected', onDisconnected); await reconnect(2); }
-  } catch { /* permission not persisted: user taps Connect */ }
+    if (d) {
+      device = d; d.addEventListener('gattserverdisconnected', onDisconnected);
+      // A remembered device must be "seen" (advertising) before Chrome can connect to it again.
+      if (d.watchAdvertisements) await withTimeout(d.watchAdvertisements(), 4000).catch(() => undefined);
+      await reconnect(2);
+    }
+  } catch { /* permission not persisted: user taps Print once to pick the printer */ }
+  return !!device?.gatt?.connected;
+}
+
+// Reconnect automatically when the app comes back to the foreground.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && localStorage.getItem(LAST_DEVICE) && state.status === 'disconnected') void restorePrinter();
+  });
 }
 
 export function disconnectPrinter() {

@@ -16,8 +16,6 @@ const writeCache = (v: { user: User; csrf: string } | null) => {
 interface AuthCtx {
   user: User | null; loading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  /** backend=true: local emulator demo (real API); otherwise the in-browser sample backend. */
-  demo: (as: 'admin' | 'waiter', backend: boolean) => Promise<void>;
   logout: () => Promise<void>;
   setLanguage: (l: Lang) => Promise<void>;
   updateCsrf: (t: string) => void;
@@ -53,14 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const login = async (username: string, password: string) => {
-    try { localStorage.removeItem('srbh.demo'); localStorage.removeItem('srbh.demoDb'); } catch { /* ignore */ } // real login never goes to the demo
     await accept(await api('/auth/login', { method: 'POST', body: { username, password } }));
-  };
-  const demo = async (as: 'admin' | 'waiter', backend: boolean) => {
-    if (backend) return accept(await api('/demo/login', { method: 'POST', body: { as } }));
-    const { startDemo } = await import('../demo/mockServer');
-    startDemo(as);
-    await accept(await api('/auth/me'));
   };
   const logout = async () => { await api('/auth/logout', { method: 'POST' }).catch(() => undefined); clear(); };
   const setLanguage = async (l: Lang) => {
@@ -74,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   const updateCsrf = (t: string) => { setCsrf(t); if (user) writeCache({ user, csrf: t }); };
 
-  return <Ctx.Provider value={{ user, loading, login, demo, logout, setLanguage, updateCsrf }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, loading, login, logout, setLanguage, updateCsrf }}>{children}</Ctx.Provider>;
 }
 
 export const useAuth = () => useContext(Ctx);

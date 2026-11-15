@@ -119,7 +119,6 @@ export function AppLayout() {
     return window.innerWidth >= 1024; // tablets start collapsed (icons), desktops expanded
   });
   const isAdmin = user?.role === 'admin';
-  const isDemoMode = (() => { try { return !!localStorage.getItem('srbh.demo'); } catch { return false; } })();
   const items = NAV.filter((n) => !n.admin || isAdmin).map((n) => (n.to === '/settings' && !isAdmin ? { ...n, key: 'nav.account' as Key } : n));
   // Bottom bar: 2 tabs · big centre "New order" · 1 tab · More (drawer). Admin: Dashboard/Tables · Orders; waiter: Tables/Orders · Reports.
   const find = (to: string) => items.find((i) => i.to === to)!;
@@ -205,12 +204,6 @@ export function AppLayout() {
             <ProfileMenu onLogout={doLogout} />
           </div>
         </div>
-        {isDemoMode && (
-          <div className="bg-secondary text-white px-4 py-2 text-sm font-semibold flex flex-wrap items-center justify-between gap-2" data-testid="demo-banner">
-            <span>🧪 {t('demo.banner')}</span>
-            <button className="btn-ghost !min-h-9 !py-1 bg-white text-ink" onClick={doLogout}>{t('demo.exit')}</button>
-          </div>
-        )}
         {!online && <div className="bg-warning text-white px-4 py-2 text-sm font-semibold">{t('net.offline')}</div>}
         {mine.length > 0 && (
           <div className="bg-accent-soft border-t border-accent px-4 py-2 text-sm font-semibold flex flex-wrap items-center justify-between gap-2">

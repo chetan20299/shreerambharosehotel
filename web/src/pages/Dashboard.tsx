@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useI18n } from '../i18n';
 import { useApi } from '../hooks';
 import { Filters, filterQuery, initialFilters } from '../components/Filters';
-import { ShareBar, SimpleChart } from '../components/Chart';
+import { SimpleChart } from '../components/Chart';
 import { Empty, PageHeader, SkeletonGrid, Stat, useUi } from '../components/ui';
 import { inr } from '../utils/format';
 import type { Order, Summary } from '../types';
@@ -34,14 +34,6 @@ export default function DashboardPage() {
 
           {s.orderCount === 0 ? <Empty text={t('orders.none')} /> : (
             <>
-              <section className="card p-4">
-                <h2 className="font-bold mb-3">{t('dash.hallSplit')}</h2>
-                <ShareBar parts={(['nonac', 'ac'] as const).map((k) => {
-                  const b = s.byCategory?.find((c) => c.key === k);
-                  return { label: `${k === 'ac' ? '❄️' : '🌀'} ${t(`hall.${k}`)} · ${b?.orders ?? 0}`, value: b?.amount ?? 0, color: k === 'ac' ? '#1D4E89' : '#E2A62B', display: inr(b?.amount ?? 0) };
-                })} />
-              </section>
-
               <div className="grid gap-4 lg:grid-cols-2">
                 {s.byDay.length > 1 && (
                   <section className="card p-4 min-w-0">
@@ -72,7 +64,7 @@ export default function DashboardPage() {
                   {data.recent.slice(0, 5).map((o) => (
                     <li key={o.id}>
                       <Link to={`/orders/${o.id}`} className={`flex items-center justify-between gap-2 py-2 ${o.status === 'cancelled' ? 'opacity-60 line-through' : ''}`}>
-                        <span className="min-w-0"><b className="text-primary">#{o.billNo}</b> <span className="text-sm text-muted">{o.time.slice(0, 5)} · {o.tableLabel} · {o.waiterName}</span></span>
+                        <span className="min-w-0"><b className="text-primary">#{o.billNo}</b> <span className="text-sm text-muted">{o.time.slice(0, 5)} · {o.waiterName}</span></span>
                         <b className="tabular-nums shrink-0">{inr(o.total)}</b>
                       </Link>
                     </li>
