@@ -22,6 +22,11 @@ function ItemPicker({ options, selected, onChange }: { options: string[]; select
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => { // phones: bring the search box to the top so the list is visible above the keyboard
+    if (open && window.innerWidth < 768) setTimeout(() => box.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 150);
+  }, [open]);
+  const close = () => { setOpen(false); input.current?.blur(); };
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
@@ -46,9 +51,9 @@ function ItemPicker({ options, selected, onChange }: { options: string[]; select
       )}
       <div className="relative">
         <span aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">🔍</span>
-        <input className="input pl-10" value={q} placeholder={t('exp.searchPh')} aria-label={t('exp.searchPh')} role="combobox" aria-expanded={open}
+        <input ref={input} type="search" enterKeyHint="done" autoComplete="off" autoCorrect="off" spellCheck={false} className="input pl-10 pr-10" value={q} placeholder={t('exp.searchPh')} aria-label={t('exp.searchPh')} role="combobox" aria-expanded={open}
           onFocus={() => setOpen(true)} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onKeyDown={(e) => {
-            if (e.key === 'Escape') setOpen(false);
+            if (e.key === 'Escape') close();
             if (e.key === 'Enter') { // type a new expense name + Enter → added straight away
               e.preventDefault();
               const hit = shown.length === 1 && !custom ? shown[0]! : custom;
@@ -57,9 +62,11 @@ function ItemPicker({ options, selected, onChange }: { options: string[]; select
             }
           }}
           data-testid="expense-search" />
+        {q && <button type="button" onClick={() => setQ('')} aria-label={t('common.close')} className="absolute right-1 top-1/2 -translate-y-1/2 grid place-items-center h-10 w-10 text-muted">✕</button>}
       </div>
       {open && (
-        <ul role="listbox" aria-multiselectable="true" className="absolute z-30 mt-1 w-full max-h-72 overflow-y-auto card shadow-xl p-1" data-testid="expense-options">
+        <ul role="listbox" aria-multiselectable="true" data-testid="expense-options"
+          className="absolute z-30 mt-1 left-0 right-0 max-h-[min(18rem,45dvh)] overflow-y-auto overscroll-contain card shadow-xl p-1 scroll-pb-14">
           {custom && (
             <li><button type="button" className="w-full text-left rounded-lg px-3 min-h-11 font-semibold text-primary hover:bg-primary-soft"
               onClick={() => { toggle(custom); setQ(''); }} data-testid="expense-custom">＋ {t('exp.useCustom', { name: custom })}</button></li>
@@ -69,7 +76,7 @@ function ItemPicker({ options, selected, onChange }: { options: string[]; select
             return (
               <li key={o} role="option" aria-selected={on}>
                 <button type="button" onClick={() => toggle(o)} data-testid={`opt-${o}`}
-                  className={`w-full flex items-center gap-3 rounded-lg px-3 min-h-11 text-left ${on ? 'bg-primary-soft font-semibold' : 'hover:bg-bg'}`}>
+                  className={`w-full flex items-center gap-3 rounded-lg px-3 min-h-12 text-left text-base ${on ? 'bg-primary-soft font-semibold' : 'hover:bg-bg'}`}>
                   <span aria-hidden className={`grid place-items-center h-5 w-5 shrink-0 rounded border-2 text-xs text-white ${on ? 'bg-primary border-primary' : 'border-line bg-white'}`}>{on ? '✓' : ''}</span>
                   <span className="min-w-0 truncate">{o}</span>
                 </button>
@@ -77,7 +84,8 @@ function ItemPicker({ options, selected, onChange }: { options: string[]; select
             );
           })}
           {!shown.length && !custom && <li className="px-3 py-3 text-sm text-muted">{t('search.none', { q })}</li>}
-          <li className="sticky bottom-0 bg-card pt-1"><button type="button" className="btn-ghost w-full !min-h-10" onClick={() => setOpen(false)}>{t('tables.done')}</button></li>
+          <li className="sticky bottom-0 bg-card pt-1 border-t border-line"><button type="button" className="btn-primary w-full !min-h-11" onClick={close}>
+            ✓ {t('tables.done')}{selected.length ? ` (${selected.length})` : ''}</button></li>
         </ul>
       )}
     </div>
@@ -189,12 +197,12 @@ export default function ExpensesPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t('common.date')}>
-            <input type="date" className="input" max={istToday()} value={when.date} onChange={(e) => setWhen({ ...when, date: e.target.value })} data-testid="expense-date" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1" data-testid="expense-when">
+          <Field label={`📅 ${t('common.date')}`}>
+            <input type="date" className="input w-full min-w-0" max={istToday()} value={when.date} onChange={(e) => setWhen({ ...when, date: e.target.value })} data-testid="expense-date" />
           </Field>
-          <Field label={t('common.time')}>
-            <input type="time" className="input" value={when.time} onChange={(e) => setWhen({ ...when, time: e.target.value })} data-testid="expense-time" />
+          <Field label={`🕒 ${t('common.time')}`}>
+            <input type="time" className="input w-full min-w-0" value={when.time} onChange={(e) => setWhen({ ...when, time: e.target.value })} data-testid="expense-time" />
           </Field>
         </div>
         <button className="btn-primary w-full sm:w-auto" disabled={!valid || saving} data-testid="expense-save">

@@ -118,3 +118,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .anim-paper-peek { animation: paper-peek 1.6s ease-in-out infinite; }
 .print-stamp { transform: rotate(-12deg); animation: stamp-in .35s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .bt-pulse, .bt-wave, .anim-paper-peek, .print-stamp { animation: none; } }
+
+/* no-zoom inputs: phones zoom into any input under 16px, which breaks the layout. */
+@media (max-width: 1023px) { input, select, textarea { font-size: max(16px, 1rem) !important; } }
+/* Native date/time pickers: fill their column, never overflow it. */
+input[type='date'], input[type='time'] { min-width: 0; max-width: 100%; display: block; -webkit-appearance: none; appearance: none; }
+input[type='date']::-webkit-date-and-time-value, input[type='time']::-webkit-date-and-time-value { text-align: left; margin: 0; }
+input[type='date']::-webkit-calendar-picker-indicator, input[type='time']::-webkit-calendar-picker-indicator { opacity: .7; padding: 4px; cursor: pointer; }
