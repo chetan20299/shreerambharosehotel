@@ -5,9 +5,10 @@ import { useApi } from '../hooks';
 import { Filters, filterQuery, initialFilters, type FilterState } from '../components/Filters';
 import { Loader } from '../components/Brand';
 import { Empty, PageHeader, SkeletonGrid, SkeletonList, Stat, useUi } from '../components/ui';
-import { download, reportFileName, reportPdf, shareOrDownload, toCsv, toJson, HOTEL } from '../exports';
+import { download, reportFileName, reportPdf, shareOrDownload, HOTEL } from '../exports';
+import { api } from '../services/api';
 import { inr } from '../utils/format';
-import type { Order, Summary } from '../types';
+import type { Expense, Order, Summary } from '../types';
 
 export const rangeLabel = (f: FilterState) =>
   `${f.from}${f.fromTime ? ` ${f.fromTime}` : ''}${f.to !== f.from || f.toTime ? ` to ${f.to}${f.toTime ? ` ${f.toTime}` : ''}` : ''}`;
@@ -20,16 +21,17 @@ export default function ReportsPage() {
   const [f, setF] = useState(initialFilters('today'));
   const { data, loading, error } = useApi<{ from: string; to: string; orders: Order[]; summary: Summary }>('/orders', filterQuery(f));
   const [busy, setBusy] = useState(false);
+  const [withExpense, setWithExpense] = useState(true);
 
-  const exportAs = async (format: 'csv' | 'pdf' | 'json', share: boolean) => {
+  /** PDF only. "With expenses" adds the Expenses table and the Net profit summary. */
+  const exportPdf = async (share: boolean) => {
     if (!data) return;
     setBusy(true);
     try {
       const { from, to, orders, summary } = data; // server-clamped range (waiters: own orders, last 30 days)
-      const blob = format === 'csv' ? new Blob([toCsv(orders)], { type: 'text/csv;charset=utf-8' })
-        : format === 'json' ? new Blob([toJson(orders, from, to)], { type: 'application/json' })
-        : await reportPdf(orders, summary, rangeLabel({ ...f, from, to }));
-      const name = reportFileName('Report', from, to, format);
+      const expenses = withExpense ? (await api<{ expenses: Expense[] }>('/expenses', { query: { from, to } })).expenses : undefined;
+      const blob = await reportPdf(orders, summary, rangeLabel({ ...f, from, to }), expenses);
+      const name = reportFileName(withExpense ? 'Report_with_expenses' : 'Report', from, to, 'pdf');
       if (share) {
         const r = await shareOrDownload(blob, name, `${HOTEL} report ${from}`);
         if (r === 'cancelled') return;
@@ -56,13 +58,18 @@ export default function ReportsPage() {
 
           <div className="card p-4 mb-4">
             <div className="font-bold mb-3">📤 {t('reports.download')} / {t('reports.share')}</div>
-            <div className="grid grid-cols-3 gap-2">
-              {(['csv', 'pdf', 'json'] as const).map((fmt) => (
-                <div key={fmt} className="grid gap-2">
-                  <button className="btn-primary" disabled={busy} onClick={() => exportAs(fmt, false)} data-testid={`export-${fmt}`}>⬇️ {fmt.toUpperCase()}</button>
-                  <button className="btn-ghost" disabled={busy} onClick={() => exportAs(fmt, true)}>📤 {t('reports.share')}</button>
-                </div>
+            <div className="label">{t('reports.pdfType')}</div>
+            <div className="grid grid-cols-2 gap-2 mb-3" role="radiogroup" aria-label={t('reports.pdfType')}>
+              {([true, false] as const).map((w) => (
+                <button key={String(w)} type="button" role="radio" aria-checked={withExpense === w} onClick={() => setWithExpense(w)}
+                  data-testid={w ? 'pdf-with-expense' : 'pdf-without-expense'}
+                  className={`btn border ${withExpense === w ? 'bg-ink text-white border-ink' : 'bg-white border-line text-ink'}`}>
+                  {w ? '🧾 ' + t('reports.withExpense') : '📄 ' + t('reports.withoutExpense')}</button>
               ))}
+            </div>
+            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2">
+              <button className="btn-primary" disabled={busy} onClick={() => exportPdf(false)} data-testid="export-pdf">⬇️ {t('reports.downloadPdf')}</button>
+              <button className="btn-ghost" disabled={busy} onClick={() => exportPdf(true)} data-testid="share-pdf">📤 {t('reports.sharePdf')}</button>
             </div>
             <p className="text-xs text-muted mt-2">{t('reports.englishNote')} {t('reports.olderNote')}</p>
           </div>

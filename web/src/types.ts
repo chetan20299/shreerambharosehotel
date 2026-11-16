@@ -42,3 +42,5 @@ export interface Settings {
   hotelName: string; address: string; phone: string; gstin: string; footer: string; paperWidth: 58 | 80;
 }
 export interface MonthlySummary extends Summary { month: string; updatedAt?: string }
+
+export interface Expense { id: string; description: string; amount: number; date: string; time: string; addedBy: string; addedByName: string }

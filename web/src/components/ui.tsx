@@ -114,12 +114,17 @@ export function PageHeader({ title, actions }: { title: ReactNode; actions?: Rea
   );
 }
 
-export function Stat({ label, value, tone = 'ink' }: { label: string; value: ReactNode; tone?: 'ink' | 'primary' | 'secondary' | 'accent' }) {
-  const color = { ink: 'text-ink', primary: 'text-primary', secondary: 'text-secondary', accent: 'text-primary-dark' }[tone];
+export function Stat({ label, value, tone = 'ink', icon, hint, testId }: {
+  label: string; value: ReactNode; tone?: 'ink' | 'primary' | 'secondary' | 'accent' | 'success' | 'error'; icon?: string; hint?: string; testId?: string;
+}) {
+  const color = { ink: 'text-ink', primary: 'text-primary', secondary: 'text-secondary', accent: 'text-primary-dark', success: 'text-success', error: 'text-error' }[tone];
   return (
-    <div className="card p-4 min-w-0">
-      <div className="text-sm font-semibold text-muted">{label}</div>
+    <div className="card p-4 min-w-0" data-testid={testId}>
+      <div className="flex items-center gap-2 text-sm font-semibold text-muted">
+        {icon && <span aria-hidden className="text-lg leading-none">{icon}</span>}<span className="min-w-0">{label}</span>
+      </div>
       <div className={`text-2xl font-bold mt-1 tabular-nums ${color}`}>{value}</div>
+      {hint && <div className="text-xs text-muted mt-1 leading-snug">{hint}</div>}
     </div>
   );
 }

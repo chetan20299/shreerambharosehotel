@@ -1,4 +1,4 @@
-import type { Order, Settings, Summary } from '../types';
+import type { Expense, Order, Settings, Summary } from '../types';
 import { ascii, receiptLines } from '../printing/receipt';
 
 // All exported files are English-only, regardless of the UI language.
@@ -40,7 +40,8 @@ async function pngDataUrl(src: string) {
 
 const rs = (n: number) => `Rs. ${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export async function reportPdf(orders: Order[], summary: Summary, range: string) {
+/** Sales report. Pass `expenses` for the "with expenses" version: adds an Expenses table and a Net profit summary. */
+export async function reportPdf(orders: Order[], summary: Summary, range: string, expenses?: Expense[]) {
   const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const logo = await pngDataUrl('/brand/logo-horizontal.png').catch(() => null);
@@ -71,6 +72,42 @@ export async function reportPdf(orders: Order[], summary: Summary, range: string
     ])),
     foot: [['', '', '', '', '', '', '', 'Total', summary.totalAmount.toFixed(2), '']],
   });
+  if (expenses) {
+    const spent = expenses.reduce((s, e) => s + Math.round(e.amount * 100), 0) / 100;
+    const net = Math.round((summary.totalAmount - spent) * 100) / 100;
+    const heading = (title: string) => {
+      const y = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 30) + 10;
+      doc.setFontSize(12).setFont('helvetica', 'bold').setTextColor(43, 29, 20).text(title, 14, y);
+      return y + 3;
+    };
+    autoTable(doc, {
+      startY: heading('Expenses'), theme: 'striped', styles: { fontSize: 9 }, headStyles: { fillColor: [198, 40, 40] },
+      head: [['Date', 'Time', 'Expense', 'Added by', 'Amount']],
+      body: expenses.length ? expenses.map((e) => [e.date, e.time, ascii(e.description), ascii(e.addedByName), rs(e.amount)]) : [['', '', 'No expenses in this period', '', rs(0)]],
+      foot: [['', '', '', 'Total expenses', rs(spent)]],
+      footStyles: { fillColor: [253, 236, 234], textColor: [198, 40, 40], fontStyle: 'bold' },
+      columnStyles: { 4: { halign: 'right' } },
+    });
+    const good = net >= 0;
+    autoTable(doc, {
+      startY: heading('Summary'), theme: 'grid', styles: { fontSize: 12, cellPadding: 4 },
+      columnStyles: { 0: { fontStyle: 'bold' }, 1: { halign: 'right', fontStyle: 'bold' } },
+      body: [
+        ['Total income (sales)', rs(summary.totalAmount)],
+        ['Total expenses', `- ${rs(spent)}`],
+        [good ? 'Net profit' : 'Net loss', rs(Math.abs(net))],
+      ],
+      didParseCell: (c) => {
+        if (c.section !== 'body') return;
+        if (c.row.index === 0) { c.cell.styles.fillColor = [220, 235, 228]; c.cell.styles.textColor = [31, 95, 74]; }
+        if (c.row.index === 1) { c.cell.styles.fillColor = [253, 236, 234]; c.cell.styles.textColor = [198, 40, 40]; }
+        if (c.row.index === 2) {
+          c.cell.styles.fillColor = good ? [46, 125, 79] : [198, 40, 40];
+          c.cell.styles.textColor = [255, 255, 255]; c.cell.styles.fontSize = 14;
+        }
+      },
+    });
+  }
   const pages = doc.getNumberOfPages();
   for (let p = 1; p <= pages; p++) doc.setPage(p).setFontSize(8).text(`Page ${p} of ${pages}`, 196, 290, { align: 'right' });
   return doc.output('blob');

@@ -53,6 +53,14 @@ service cloud.firestore {
             && request.resource.data.status == 'billed');
       allow delete: if admin();
     }
+    // Daily hotel expenses: everyone adds their own; admin sees/deletes all, a waiter only their own.
+    match /expenses/{id} {
+      allow read: if admin() || (staff() && resource.data.addedBy == uname());
+      allow create: if staff() && request.resource.data.addedBy == uname()
+        && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount <= 1000000
+        && request.resource.data.date is string && request.resource.data.description is string;
+      allow delete: if admin() || (staff() && resource.data.addedBy == uname());
+    }
     match /dailyStats/{date} {
       allow read, create, update: if staff();
       allow delete: if admin();

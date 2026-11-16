@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { I18nProvider, useI18n } from './i18n';
 import { UiProvider } from './components/ui';
 import { Loader } from './components/Brand';
+import { OfflineNotice } from './components/OfflineNotice';
 import { AppLayout } from './layouts/AppLayout';
 import { LoginPage } from './pages/Login';
 import { ResetPasswordPage } from './pages/ResetPassword';
@@ -15,6 +16,7 @@ import { SettingsPage } from './pages/Settings';
 // Admin-only / heavy pages are code-split so waiter phones load less.
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
 const ReportsPage = lazy(() => import('./pages/Reports'));
+const ExpensesPage = lazy(() => import('./pages/Expenses'));
 const MenuPage = lazy(() => import('./pages/Menu'));
 const UsersPage = lazy(() => import('./pages/Users'));
 const HistoryPage = lazy(() => import('./pages/History'));
@@ -43,6 +45,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <SwitchingOverlay />
+      <OfflineNotice />
       <Suspense fallback={<Loader label={t('loader.loading')} />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -55,6 +58,7 @@ export default function App() {
             <Route path="orders" element={<OrdersPage />} />
             <Route path="orders/:id" element={<BillPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="expenses" element={<ExpensesPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="dashboard" element={<Guard admin><DashboardPage /></Guard>} />
             <Route path="menu" element={<Guard admin><MenuPage /></Guard>} />

@@ -19,6 +19,7 @@ const NAV: Item[] = [
   { to: '/new', key: 'tables.newOrder', icon: 'plus' },
   { to: '/orders', key: 'nav.orders', icon: 'orders' },
   { to: '/reports', key: 'nav.reports', icon: 'reports' },
+  { to: '/expenses', key: 'nav.expenses', icon: 'expense' },
   { to: '/menu', key: 'nav.menu', icon: 'menu', admin: true },
   { to: '/users', key: 'nav.users', icon: 'users', admin: true },
   { to: '/history', key: 'nav.history', icon: 'history', admin: true },

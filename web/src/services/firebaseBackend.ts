@@ -25,6 +25,7 @@ import {
   type MenuItem, type Order, type PriceCategory,
 } from '../../../functions/src/orders';
 import { istParts, istToday, istRange, istToUtc, addDays } from '../../../functions/src/time';
+import type { Expense } from '../types';
 
 // ---------------- setup ----------------
 const env = import.meta.env;
@@ -176,6 +177,23 @@ async function queryOrders(u: Me, q: Record<string, string>) {
     (!q.tableId || o.tableId === q.tableId) && (!q.status || o.status === q.status) && (!q.menuItemId || o.items.some((i) => i.menuItemId === q.menuItemId)));
   return { orders, from, to };
 }
+
+/** Expenses in a date range: admin sees everyone's, a waiter only their own (rules enforce it too). */
+async function queryExpenses(u: Me, from: string, to: string): Promise<Expense[]> {
+  need(DATE.test(from) && DATE.test(to), 'Date must be YYYY-MM-DD');
+  need(from <= to, 'Start date is after end date');
+  const cs: QueryConstraint[] = [where('date', '>=', from), where('date', '<=', to)];
+  if (u.role !== 'admin') cs.push(where('addedBy', '==', u.id));
+  return (await getDocs(query(col('expenses'), ...cs))).docs
+    .map((d) => { const e = d.data(); return { id: d.id, description: e.description, amount: e.amount, date: e.date, time: e.time, addedBy: e.addedBy, addedByName: e.addedByName }; })
+    .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
+}
+export const DEFAULT_EXPENSE_ITEMS = [
+  'Vegetables', 'Milk', 'Curd / Buttermilk', 'Gas cylinder', 'Groceries (Kirana)', 'Oil / Ghee', 'Flour (Atta)', 'Rice', 'Dal / Pulses',
+  'Spices / Masala', 'Sugar / Jaggery', 'Fruits', 'Paneer', 'Drinking water', 'Cold drinks stock', 'Electricity bill', 'Water bill',
+  'Staff salary / Wages', 'Rent', 'Cleaning supplies', 'Disposables / Packing', 'Repair / Maintenance', 'Transport / Fuel', 'Other',
+];
+const sumOf = (xs: { amount: number }[]) => xs.reduce((s, e) => s + Math.round(e.amount * 100), 0) / 100;
 
 /** Admin only (reads all of that day's orders). */
 async function recomputeDay(date: string) {
@@ -710,14 +728,15 @@ async function route(method: string, path: string, q: Record<string, string>, b:
     const stats = async (f: string, t: string) => (await getDocs(query(col('dailyStats'), where('date', '>=', f), where('date', '<=', t)))).docs
       .reduce<Summary | undefined>((acc, d) => mergeSummaries(acc, d.data() as Summary), undefined) ?? summarize([]);
     const { start, end } = istRange(from, to);
-    const [summary, previous, recent, staff] = await Promise.all([
+    const [summary, previous, recent, staff, expenses] = await Promise.all([
       filtered ? queryOrders(a, q).then((r) => summarize(r.orders)) : stats(from, to),
       filtered ? Promise.resolve(null) : stats(prevFrom, prevTo),
       getDocs(query(col('orders'), where('createdAt', '>=', Timestamp.fromDate(start)), where('createdAt', '<', Timestamp.fromDate(end)), orderBy('createdAt', 'desc'), limit(10))),
       getDocs(col('users')),
+      queryExpenses(a, from, to),
     ]);
     return {
-      from, to, summary, recent: recent.docs.map(toOrder),
+      from, to, summary, recent: recent.docs.map(toOrder), expensesTotal: sumOf(expenses),
       previous: previous && { from: prevFrom, to: prevTo, orderCount: previous.orderCount, totalAmount: previous.totalAmount, thaliCount: previous.thaliCount, extraAmount: previous.extraAmount },
       tableStatus: {},
       activeWaiters: staff.docs.filter((d) => {
@@ -731,6 +750,44 @@ async function route(method: string, path: string, q: Record<string, string>, b:
     return (await getDocs(query(col('monthlySummaries'), orderBy('month', 'desc'), limit(12)))).docs.map((d) => ({ ...d.data(), updatedAt: iso(d.data().updatedAt) }));
   }
   if (key === 'POST /maintenance/rollup') { await adminOnly(); return runRollup(); }
+
+  // ===== expense items (the pick-list; one doc config/expenseItems, admin manages) =====
+  if (key === 'GET /expense-items') {
+    await me();
+    const d = await getDoc(doc(db, 'config/expenseItems'));
+    return { items: (d.data()?.items as string[] | undefined) ?? DEFAULT_EXPENSE_ITEMS, defaults: DEFAULT_EXPENSE_ITEMS };
+  }
+  if (key === 'PUT /expense-items') {
+    await adminOnly();
+    const seen = new Set<string>();
+    const items = (Array.isArray(b.items) ? b.items : []).map((v) => text(v, 40)).filter((v) => v && !seen.has(v.toLowerCase()) && seen.add(v.toLowerCase())).slice(0, 200);
+    await setDoc(doc(db, 'config/expenseItems'), { items, updatedAt: serverTimestamp() });
+    return { items };
+  }
+
+  // ===== expenses (daily hotel costs; admin + waiters) =====
+  if (key === 'GET /expenses') {
+    const u = await me();
+    const from = q.from ?? istToday(), to = q.to ?? from;
+    const expenses = await queryExpenses(u, from, to);
+    return { from, to, expenses, total: sumOf(expenses) };
+  }
+  if (key === 'POST /expenses') {
+    const u = await me();
+    const description = text(b.description, 120), amount = Number(b.amount), date = String(b.date ?? ''), time = String(b.time ?? '');
+    need(description, 'Write what the expense was for');
+    need(Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 && Math.round(amount * 100) === amount * 100, 'Enter an amount between ₹0.01 and ₹10,00,000');
+    need(DATE.test(date) && date <= istToday(), 'Choose a valid date (not in the future)');
+    need(TIME.test(time), 'Choose a valid time');
+    const id = newId('e');
+    await setDoc(doc(db, 'expenses', id), { description, amount, date, time, addedBy: u.id, addedByName: u.displayName, createdAt: serverTimestamp() });
+    return { id, description, amount, date, time, addedBy: u.id, addedByName: u.displayName };
+  }
+  if ((x = m(/^\/expenses\/([\w-]+)$/)) && method === 'DELETE') {
+    await me();
+    await deleteDoc(doc(db, 'expenses', x[1]!)); // rules: admin, or the person who added it
+    return { ok: true };
+  }
 
   // ===== settings, backups =====
   if (key === 'GET /settings') { await me(); return loadSettings(); }

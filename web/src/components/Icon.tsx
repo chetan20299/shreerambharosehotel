@@ -4,6 +4,7 @@ const PATHS = {
   tables: 'M4 9h16M6 9v10M18 9v10M8 5h8a2 2 0 0 1 2 2v2H6V7a2 2 0 0 1 2-2zM9 14h6',
   orders: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3',
   reports: 'M12 3v12M7 10l5 5 5-5M4 19h16',
+  expense: 'M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4zM4 7l11-3v3M15 13.5h3M8 11h4M8 15h3',
   menu: 'M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2zM5 18a2 2 0 0 1 2-2h12M9 8h6M9 11h4',
   users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6',
   history: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8 14h3M8 17h6',

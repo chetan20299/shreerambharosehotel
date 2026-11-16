@@ -98,3 +98,23 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .anim-plate, .anim-drop, .anim-paper, .anim-blink, .anim-dot { animation: none; }
   .anim-check { stroke-dashoffset: 0; animation: none; }
 }
+
+/* Offline notice (OfflineNotice.tsx) */
+@keyframes off-wave { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
+@keyframes off-slash { from { stroke-dashoffset: 110; } to { stroke-dashoffset: 0; } }
+@keyframes off-cloud { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(14px); } }
+.off-wave { animation: off-wave 1.6s ease-in-out infinite; }
+.off-w1 { animation-delay: 0s; } .off-w2 { animation-delay: .2s; } .off-w3 { animation-delay: .4s; }
+.off-slash { stroke-dasharray: 110; animation: off-slash .6s .3s ease-out both; }
+.off-cloud { animation: off-cloud 4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .off-wave, .off-cloud { animation: none; } .off-slash { animation: none; stroke-dashoffset: 0; } }
+
+/* Connect-printer dialog + printed stamp (BillView.tsx) */
+@keyframes bt-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@keyframes paper-peek { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+@keyframes stamp-in { 0% { transform: scale(2) rotate(-12deg); opacity: 0; } 100% { transform: scale(1) rotate(-12deg); opacity: 1; } }
+.bt-pulse, .bt-wave { animation: bt-pulse 1.2s ease-in-out infinite; }
+.bt-w2 { animation-delay: .3s; }
+.anim-paper-peek { animation: paper-peek 1.6s ease-in-out infinite; }
+.print-stamp { transform: rotate(-12deg); animation: stamp-in .35s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .bt-pulse, .bt-wave, .anim-paper-peek, .print-stamp { animation: none; } }

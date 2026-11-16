@@ -8,7 +8,7 @@ import { Empty, PageHeader, SkeletonGrid, Stat, useUi } from '../components/ui';
 import { inr } from '../utils/format';
 import type { Order, Summary } from '../types';
 
-interface Dash { from: string; to: string; summary: Summary; recent: Order[] }
+interface Dash { from: string; to: string; summary: Summary; recent: Order[]; expensesTotal?: number }
 
 /** Simple dashboard: 4 numbers, AC vs Non-AC, one daily sales chart, top items, last 5 orders. */
 export default function DashboardPage() {
@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const { data, loading, error } = useApi<Dash>('/dashboard', filterQuery(f), { poll: 120_000 });
   const s = data?.summary;
   const avg = s && s.orderCount ? Math.round(s.totalAmount / s.orderCount) : 0;
+  const net = Math.round(((s?.totalAmount ?? 0) - (data?.expensesTotal ?? 0)) * 100) / 100;
 
   return (
     <div className="space-y-4">
@@ -25,11 +26,28 @@ export default function DashboardPage() {
       <Filters value={f} onChange={setF} times={false} />
       {loading && !data ? <SkeletonGrid count={4} /> : error && !data ? <Empty text={errorText(error)} /> : s && data && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Stat label={t('dash.sales')} value={inr(s.totalAmount)} tone="primary" />
-            <Stat label={t('dash.orders')} value={s.orderCount} />
-            <Stat label={t('dash.thalis')} value={s.thaliCount} tone="secondary" />
-            <Stat label={t('dash.avgBill')} value={inr(avg)} />
+          <p className="text-sm text-muted -mt-1" data-testid="dash-period">📅 {t('dash.showing', { range: data.from === data.to ? data.from : `${data.from} → ${data.to}` })}</p>
+
+          {/* Money: income − expenses = net profit */}
+          <div>
+            <h2 className="font-bold mb-2">{t('dash.money')}</h2>
+            <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-3" data-testid="dash-profit">
+              <Stat icon="💰" label={t('dash.income')} value={inr(s.totalAmount)} tone="secondary" hint={t('dash.incomeHint', { n: s.orderCount })} testId="stat-income" />
+              <Stat icon="🧾" label={t('dash.expenses')} value={`− ${inr(data.expensesTotal ?? 0)}`} tone="error" hint={t('dash.expensesHint')} testId="stat-expenses" />
+              <Stat icon={net >= 0 ? '📈' : '📉'} label={net >= 0 ? t('dash.netProfit') : t('dash.netLoss')} value={inr(Math.abs(net))} tone={net >= 0 ? 'success' : 'error'}
+                hint={t('dash.netHint')} testId="stat-net" />
+            </div>
+          </div>
+
+          {/* Sales details */}
+          <div>
+            <h2 className="font-bold mb-2">{t('dash.salesDetails')}</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <Stat icon="🧾" label={t('dash.bills')} value={s.orderCount} hint={s.cancelledCount ? t('reports.cancelledNote', { n: s.cancelledCount }) : undefined} />
+              <Stat icon="🍽️" label={t('dash.thalis')} value={s.thaliCount} tone="secondary" />
+              <Stat icon="➗" label={t('dash.avgBill')} value={inr(avg)} hint={t('dash.avgHint')} />
+              <Stat icon="➕" label={t('reports.extra')} value={inr(s.extraAmount)} tone="accent" hint={t('dash.extraHint')} />
+            </div>
           </div>
 
           {s.orderCount === 0 ? <Empty text={t('orders.none')} /> : (

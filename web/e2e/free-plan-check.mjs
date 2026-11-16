@@ -132,10 +132,9 @@ const restored = await page.evaluate(async (name) => {
   return JSON.parse(await (await api(`/backups/${encodeURIComponent(name)}`)).text());
 }, backups[0].name);
 assert.equal(restored.transactions[0].billNo, o1.billNo);
-assert.ok((await must('/audit')).length >= 8);
 await must('/maintenance/rollup', { method: 'POST' });
 assert.equal((await must('/monthly')).length, 0);
-step(`delete with gzip backup in Firestore (restored ${restored.transactions.length} bill), audit log, monthly roll-up (${today})`);
+step(`delete with gzip backup in Firestore (restored ${restored.transactions.length} bill), monthly roll-up (${today})`);
 
 await must('/auth/logout', { method: 'POST' });
 assert.equal((await api('/auth/login', { method: 'POST', body: { username: 'ramesh', password: 'Waiter@123' } })).status, 401);
@@ -171,7 +170,7 @@ assert.equal(await get(`orders/${o3.id}`, ramesh), 403); // suresh's order
 assert.equal(await patch('users/ramesh', { role: 'admin' }, ramesh), 403);
 assert.equal(await patch(`orders/${o2.id}`, { waiterName: 'Someone else' }, ramesh), 403);
 assert.equal(await patch('config/menu', { hacked: 'yes' }, ramesh), 403);
-assert.equal(await get('auditLogs', ramesh), 403);
+assert.equal(await patch('config/expenseItems', { items: ['hacked'] }, ramesh), 403); // only admin manages the expense list
 const oldRamesh = await signIn('ramesh@srbh.example.com', 'Waiter@123');
 assert.equal(await get(`orders/${o2.id}`, oldRamesh), 403);
 assert.equal(await patch('config/setup', { by: 'hacker' }, stranger), 403);
