@@ -28,9 +28,9 @@ export default function ReportsPage() {
     if (!data) return;
     setBusy(true);
     try {
-      const { from, to, orders, summary } = data; // server-clamped range (waiters: own orders, last 30 days)
+      const { from, to, summary } = data; // server-clamped range (waiters: own orders, last 30 days)
       const expenses = withExpense ? (await api<{ expenses: Expense[] }>('/expenses', { query: { from, to } })).expenses : undefined;
-      const blob = await reportPdf(orders, summary, rangeLabel({ ...f, from, to }), expenses);
+      const blob = await reportPdf(summary, rangeLabel({ ...f, from, to }), expenses);
       const name = reportFileName(withExpense ? 'Report_with_expenses' : 'Report', from, to, 'pdf');
       if (share) {
         const r = await shareOrDownload(blob, name, `${HOTEL} report ${from}`);

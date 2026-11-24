@@ -339,6 +339,8 @@ export const hi: Record<Key, string> = {
   'printer.connecting': 'प्रिंटर से जुड़ रहा है…',
   'printer.printing': 'प्रिंट हो रहा है…',
   'printer.disconnect': 'कनेक्शन हटाएँ',
+  'printer.change': 'प्रिंटर बदलें',
+  'app.install': 'ऐप इंस्टॉल करें',
   'printer.connectFirst': 'पहले ब्लूटूथ प्रिंटर जोड़ें, फिर प्रिंट करें।',
   'printer.err.cancelled': 'कोई प्रिंटर नहीं चुना गया',
   'printer.err.btOff': 'ब्लूटूथ बंद है या उपलब्ध नहीं है। ब्लूटूथ (और लोकेशन) चालू करके फिर कोशिश करें।',

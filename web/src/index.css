@@ -62,12 +62,18 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 /* Letter-spacing breaks Gujarati/Devanagari conjuncts & matras: always 0 for Indic UI text. */
 :lang(gu) *, :lang(hi) * { letter-spacing: 0 !important; }
 
-/* Branded loader: thali rim rotates, flame flickers */
+/* Branded loader: ring turns, Ram's bow draws itself, steam rises, folded hands nod (namaste) */
 @keyframes rim-spin { to { transform: rotate(360deg); } }
-@keyframes flame { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15, .9); opacity: .8; } }
-.loader-rim { transform-origin: 256px 256px; animation: rim-spin 2.4s linear infinite; }
-.loader-flame { transform-origin: 256px 260px; animation: flame .7s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .loader-rim, .loader-flame { animation: none; } }
+@keyframes bow-draw { 0% { stroke-dashoffset: 100; } 45%, 75% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -100; } }
+@keyframes steam-rise { 0% { transform: translateY(14px); opacity: 0; } 40% { opacity: 1; } 100% { transform: translateY(-18px); opacity: 0; } }
+@keyframes namaste { 0%, 60%, 100% { transform: rotate(0); } 30% { transform: rotate(-8deg) translateY(4px); } }
+.logo-anim .logo-ring { transform-origin: 256px 256px; animation: rim-spin 8s linear infinite; }
+.logo-anim .logo-bow { stroke-dasharray: 100; animation: bow-draw 2.4s ease-in-out infinite; }
+.logo-anim .logo-steam path { animation: steam-rise 1.8s ease-out infinite; }
+.logo-anim .logo-steam path:nth-child(2) { animation-delay: .3s; }
+.logo-anim .logo-steam path:nth-child(3) { animation-delay: .6s; }
+.logo-anim .logo-hands { transform-origin: 256px 370px; animation: namaste 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .logo-anim * { animation: none !important; } }
 
 /* Printing: only the receipt is printed (Android print / Save as PDF fallback). */
 @media print {

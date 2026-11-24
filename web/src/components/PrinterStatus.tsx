@@ -47,7 +47,10 @@ export function PrinterStatus({ variant = 'pill' }: { variant?: 'pill' | 'card' 
           <span>{label}{p.status === 'connected' && p.name ? ` · ${p.name}` : ''}</span>
         </div>
         {p.status === 'connected'
-          ? <button className="btn-ghost !min-h-10" onClick={disconnectPrinter}>{t('printer.disconnect')}</button>
+          ? <div className="flex gap-2">
+              <button className="btn-ghost !min-h-10" onClick={connect}>🔄 {t('printer.change')}</button>
+              <button className="btn-ghost !min-h-10" onClick={disconnectPrinter}>{t('printer.disconnect')}</button>
+            </div>
           : <button className="btn-secondary !min-h-10" onClick={connect} disabled={busy}>🔗 {t('printer.connect')}</button>}
       </div>
       {p.error && p.status !== 'connected' && <div className="mt-2 text-sm text-error font-semibold">{t(`printer.err.${p.error}` as Key)}</div>}

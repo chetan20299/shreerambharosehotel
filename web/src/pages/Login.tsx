@@ -3,8 +3,9 @@ import { Navigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n';
 import { api, ApiError } from '../services/api';
-import { Loader, ThaliMark } from '../components/Brand';
+import { Loader, LogoMark } from '../components/Brand';
 import { LanguagePicker } from '../components/LanguagePicker';
+import { InstallApp } from '../components/InstallApp';
 import { Modal, useUi } from '../components/ui';
 
 export function LoginPage() {
@@ -42,7 +43,7 @@ export function LoginPage() {
       {busy && <Loader full label={t('loader.login')} />}
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center mb-6">
-          <ThaliMark size={104} />
+          <LogoMark size={104} animated />
           <div className="font-display text-3xl mt-3">Shree Ram Bharose</div>
           <div className="text-sm font-bold tracking-[.3em] text-secondary">HINDU HOTEL</div>
           <div className="font-bold text-primary mt-1" lang="gu">શ્રી રામ ભરોસે</div>
@@ -70,6 +71,7 @@ export function LoginPage() {
         </form>
 
         <div className="mt-4"><LanguagePicker /></div>
+        <div className="mt-4 flex justify-center"><InstallApp /></div>
       </div>
       <Modal open={forgot} onClose={() => setForgot(false)} title={t('login.forgot')}>
         <p>{t('login.forgotHelp')}</p>

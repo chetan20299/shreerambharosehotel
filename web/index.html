@@ -6,6 +6,11 @@
     <title>Shree Ram Bharose Hindu Hotel</title>
     <meta name="description" content="Billing, tables and reports for Shree Ram Bharose Hindu Hotel" />
     <meta name="theme-color" content="#B4441B" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Ram Bharose" />
+    <meta name="application-name" content="Ram Bharose" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,16 +19,26 @@
     <style>
       /* Startup splash: shown before JS loads, removed by React on mount. */
       #splash { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 16px; background: #FBF6EE; font-family: Georgia, serif; color: #2B1D14; z-index: 100; }
-      #splash img { width: 120px; height: 120px; animation: splash-pulse 1.4s ease-in-out infinite; }
-      #splash .name { font-size: 22px; }
+      #splash .name { font-size: 22px; animation: splash-in .6s ease-out both .2s; }
+      #splash .sub { font: 700 12px sans-serif; letter-spacing: 4px; color: #1F5F4A; animation: splash-in .6s ease-out both .35s; }
       #splash .bar { width: 120px; height: 4px; border-radius: 2px; background: #EADFCB; overflow: hidden; }
       #splash .bar::after { content: ''; display: block; width: 40%; height: 100%; background: #B4441B; animation: splash-bar 1s ease-in-out infinite; }
-      @keyframes splash-pulse { 50% { transform: scale(1.06); } }
+      #splash svg { animation: splash-in .5s ease-out both; }
+      @keyframes splash-in { from { opacity: 0; transform: translateY(10px) scale(.92); } }
       @keyframes splash-bar { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+      /* Same logo animation as src/index.css (.logo-anim), needed before the app CSS loads */
+      @keyframes rim-spin { to { transform: rotate(360deg); } }
+      @keyframes bow-draw { 0% { stroke-dashoffset: 100; } 45%, 75% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -100; } }
+      @keyframes steam-rise { 0% { transform: translateY(14px); opacity: 0; } 40% { opacity: 1; } 100% { transform: translateY(-18px); opacity: 0; } }
+      #splash .logo-ring { transform-origin: 256px 256px; animation: rim-spin 8s linear infinite; }
+      #splash .logo-bow { stroke-dasharray: 100; animation: bow-draw 2.4s ease-in-out infinite; }
+      #splash .logo-steam path { animation: steam-rise 1.8s ease-out infinite; }
+      #splash .logo-steam path:nth-child(2) { animation-delay: .3s; }
+      #splash .logo-steam path:nth-child(3) { animation-delay: .6s; }
     </style>
   </head>
   <body>
-    <div id="splash"><img src="/brand/logo-icon.svg" alt="" /><div class="name">Shree Ram Bharose</div><div class="bar"></div></div>
+    <div id="splash"><svg class="logo-anim" viewBox="0 0 512 512" width="128" height="128" aria-hidden="true"><circle cx="256" cy="256" r="240" fill="#B4441B" /><circle cx="256" cy="256" r="222" fill="none" stroke="#E2A62B" stroke-width="6"/><circle class="logo-ring" cx="256" cy="256" r="206" fill="none" stroke="#E2A62B" stroke-width="5" stroke-linecap="round" stroke-dasharray="0.1 18" opacity="0.75"/><g transform="translate(0 -22)"><path class="logo-bow" pathLength="100" d="M108 286 Q256 40 404 286" fill="none" stroke="#E2A62B" stroke-width="18" stroke-linecap="round"/><path d="M108 286 q-8 14 -30 18 M404 286 q8 14 30 18" fill="none" stroke="#E2A62B" stroke-width="14" stroke-linecap="round"/><g class="logo-steam" fill="none" stroke="#FBF6EE" stroke-width="10" stroke-linecap="round"><path d="M206 262 c-16 -18 16 -34 0 -56"/><path d="M256 252 c-16 -20 16 -38 0 -64"/><path d="M306 262 c-16 -18 16 -34 0 -56"/></g><path d="M138 286 H374 A118 118 0 0 1 138 286 Z" fill="#FBF6EE" /><rect x="126" y="276" width="260" height="22" rx="11" fill="#E2A62B"/><g fill="#B4441B"><path d="M253 300 C244 300 237 314 235 330 C233 346 230 356 222 366 C218 372 223 379 231 376 C241 372 250 366 253 360 Z"/><path d="M 259 300 C 268 300 275 314 277 330 C 279 346 282 356 290 366 C 294 372 289 379 281 376 C 271 372 262 366 259 360 Z"/></g><path d="M241 344 q-7 6 -5 16 M271 344 q7 6 5 16" fill="none" stroke="#FBF6EE" stroke-width="3" stroke-linecap="round"/><rect x="222" y="382" width="68" height="8" rx="4" fill="#E2A62B"/><rect x="212" y="398" width="88" height="16" rx="8" fill="#E2A62B"/></g></svg><div class="name">Shree Ram Bharose</div><div class="sub">HINDU HOTEL</div><div class="bar"></div></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

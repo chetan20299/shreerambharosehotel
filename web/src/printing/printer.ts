@@ -39,7 +39,6 @@ export const usePrinter = () => useSyncExternalStore((cb) => { listeners.add(cb)
 
 let device: BluetoothDevice | undefined;
 let characteristic: BluetoothRemoteGATTCharacteristic | undefined;
-let manualDisconnect = false;
 
 const withTimeout = <T,>(p: Promise<T>, ms: number) =>
   Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new PrinterError('timeout')), ms))]);
@@ -57,10 +56,32 @@ function mapError(e: unknown): PrinterError {
 
 function onDisconnected() {
   characteristic = undefined;
-  if (manualDisconnect) { manualDisconnect = false; set({ status: 'disconnected' }); return; }
   set({ status: 'disconnected', error: state.status === 'printing' ? 'lost' : state.error });
-  void reconnect(); // printer turned off / out of range → try a few times
+  scheduleRetry(0); // printer turned off / out of range → keep retrying in the background until it is back
 }
+
+// ---- Stable connection: endless background retry with backoff + idle keep-alive ----
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
+let retryDelay = 2000;
+function scheduleRetry(delay = retryDelay) {
+  clearTimeout(retryTimer);
+  if (!device || device.gatt?.connected) return;
+  retryTimer = setTimeout(async () => {
+    await reconnect(1);
+    if (device && !device.gatt?.connected) { retryDelay = Math.min(retryDelay * 2, 30_000); scheduleRetry(); }
+  }, delay);
+}
+
+// Many BLE printers drop an idle link after ~1 min. A harmless ESC/POS real-time status request
+// (DLE EOT 1, prints nothing) every 20 s keeps it open; a failed ping forces a clean reconnect.
+const PING = new Uint8Array([0x10, 0x04, 0x01]);
+setInterval(async () => {
+  if (state.status !== 'connected' || !characteristic || !device?.gatt?.connected) return;
+  try {
+    if (characteristic.properties.writeWithoutResponse) await characteristic.writeValueWithoutResponse(PING);
+    else await withTimeout(characteristic.writeValueWithResponse(PING), 5000);
+  } catch { device?.gatt?.disconnect(); } // fires gattserverdisconnected → onDisconnected → retry
+}, 20_000);
 
 async function openChannel(d: BluetoothDevice) {
   let server: BluetoothRemoteGATTServer;
@@ -87,6 +108,7 @@ async function attach(d: BluetoothDevice) {
   d.addEventListener('gattserverdisconnected', onDisconnected);
   characteristic = await openChannel(d);
   try { localStorage.setItem(LAST_DEVICE, d.id); } catch { /* ignore */ }
+  retryDelay = 2000; clearTimeout(retryTimer);
   set({ status: 'connected', name: d.name ?? 'Printer', error: null });
 }
 
@@ -106,16 +128,19 @@ export async function connectPrinter() {
   }
 }
 
-async function reconnect(attempts = 3) {
-  if (!device) return;
-  for (let i = 0; i < attempts && !device.gatt?.connected; i++) {
-    set({ status: 'connecting' });
-    try { await attach(device); return; } catch { await new Promise((r) => setTimeout(r, 1500 * (i + 1))); }
-  }
-  if (!device.gatt?.connected) set({ status: 'disconnected' });
+let reconnecting: Promise<void> | null = null;
+/** One reconnect at a time: retry timer, app resume and print all share the same attempt. */
+function reconnect(attempts = 3) {
+  reconnecting ??= (async () => {
+    for (let i = 0; i < attempts && device && !device.gatt?.connected; i++) {
+      if (state.status !== 'printing') set({ status: 'connecting' });
+      try { await attach(device); return; } catch { if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1500 * (i + 1))); }
+    }
+    if (device && !device.gatt?.connected) set({ status: 'disconnected' });
+  })().finally(() => { reconnecting = null; });
+  return reconnecting;
 }
 
-/** On app start: silently reconnect to the last printer if Chrome remembers the permission (getDevices). */
 /**
  * Auto-reconnect to the last printer without the device picker:
  *  - same app session: reuses the remembered device;
@@ -135,6 +160,7 @@ export async function restorePrinter() {
       // A remembered device must be "seen" (advertising) before Chrome can connect to it again.
       if (d.watchAdvertisements) await withTimeout(d.watchAdvertisements(), 4000).catch(() => undefined);
       await reconnect(2);
+      scheduleRetry(); // printer off right now → keep trying in the background
     }
   } catch { /* permission not persisted: user taps Print once to pick the printer */ }
   return !!device?.gatt?.connected;
@@ -143,13 +169,15 @@ export async function restorePrinter() {
 // Reconnect automatically when the app comes back to the foreground.
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && localStorage.getItem(LAST_DEVICE) && state.status === 'disconnected') void restorePrinter();
+    if (document.visibilityState === 'visible' && localStorage.getItem(LAST_DEVICE) && state.status === 'disconnected') { retryDelay = 2000; void restorePrinter(); }
   });
 }
 
 export function disconnectPrinter() {
-  manualDisconnect = true;
+  clearTimeout(retryTimer);
+  device?.removeEventListener('gattserverdisconnected', onDisconnected);
   device?.gatt?.disconnect();
+  device = undefined;
   characteristic = undefined;
   try { localStorage.removeItem(LAST_DEVICE); } catch { /* ignore */ }
   set({ status: 'disconnected', name: null, error: null });

@@ -339,6 +339,8 @@ export const gu: Record<Key, string> = {
   'printer.connecting': 'પ્રિન્ટર સાથે જોડાઈ રહ્યું છે…',
   'printer.printing': 'પ્રિન્ટ થઈ રહ્યું છે…',
   'printer.disconnect': 'જોડાણ તોડો',
+  'printer.change': 'પ્રિન્ટર બદલો',
+  'app.install': 'એપ ઇન્સ્ટોલ કરો',
   'printer.connectFirst': 'પહેલા બ્લૂટૂથ પ્રિન્ટર જોડો, પછી પ્રિન્ટ કરો.',
   'printer.err.cancelled': 'કોઈ પ્રિન્ટર પસંદ કર્યું નથી',
   'printer.err.btOff': 'બ્લૂટૂથ બંધ છે અથવા ઉપલબ્ધ નથી. બ્લૂટૂથ (અને લોકેશન) ચાલુ કરી ફરી પ્રયાસ કરો.',

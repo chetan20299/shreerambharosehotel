@@ -40,8 +40,8 @@ async function pngDataUrl(src: string) {
 
 const rs = (n: number) => `Rs. ${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-/** Sales report. Pass `expenses` for the "with expenses" version: adds an Expenses table and a Net profit summary. */
-export async function reportPdf(orders: Order[], summary: Summary, range: string, expenses?: Expense[]) {
+/** Sales report: totals + item-wise summary (no per-bill detail). Pass `expenses` for the "with expenses" version: adds an Expenses table and a Net profit summary. */
+export async function reportPdf(summary: Summary, range: string, expenses?: Expense[]) {
   const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const logo = await pngDataUrl('/brand/logo-horizontal.png').catch(() => null);
@@ -61,16 +61,6 @@ export async function reportPdf(orders: Order[], summary: Summary, range: string
     body: summary.byItem.map((i) => [ascii(i.name) + (i.isThali ? ' (thali)' : ''), i.quantity, rs(i.amount)]),
     foot: [['Total', summary.byItem.reduce((s, i) => s + i.quantity, 0), rs(summary.totalAmount)]],
     footStyles: { fillColor: [251, 239, 211], textColor: [43, 29, 20] },
-  });
-  autoTable(doc, {
-    theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [43, 29, 20] },
-    head: [['Bill No', 'Date', 'Time', 'Waiter', 'Item', 'Qty', 'Rate', 'Amount', 'Total', 'Status']],
-    body: orders.flatMap((o) => o.items.map((i, k) => [
-      k ? '' : o.billNo, k ? '' : o.date, k ? '' : o.time.slice(0, 5), k ? '' : ascii(o.waiterName),
-      ascii(i.name + (i.description ? ` (${i.description})` : '')), i.quantity, i.unitPrice.toFixed(2), i.amount.toFixed(2),
-      k ? '' : o.total.toFixed(2), k ? '' : o.status,
-    ])),
-    foot: [['', '', '', '', '', '', '', 'Total', summary.totalAmount.toFixed(2), '']],
   });
   if (expenses) {
     const spent = expenses.reduce((s, e) => s + Math.round(e.amount * 100), 0) / 100;

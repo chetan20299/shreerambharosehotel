@@ -14,27 +14,43 @@ export const C = {
 };
 const FONTS = `<style>@import url('https://fonts.googleapis.com/css2?family=Rozha+One&amp;family=Hind+Vadodara:wght@500;700&amp;display=swap');</style>`;
 
-/** Top-down Gujarati thali: brass rim with dotted border, three katoris (dal, shaak, kadhi), rotli and rice. 512 box. */
-const thali = (mono = false) => {
-  const k = (cx, cy, fill) => `<circle cx="${cx}" cy="${cy}" r="38" fill="${mono ? '#fff' : C.accent}" ${mono ? 'stroke="#000" stroke-width="8"' : ''}/>
-    <circle cx="${cx}" cy="${cy}" r="27" fill="${mono ? '#000' : fill}"/>`;
+/**
+ * Hotel mark: saffron badge with a golden ring, Shree Ram's bow (dhanush) arching over a steaming
+ * brass handi with folded hands (namaste). 512 box. Class names drive the web loader animation (Brand.tsx).
+ */
+export const mark = (mono = false) => {
+  const c = mono
+    ? { badge: '#fff', gold: '#000', cream: '#fff', steam: '#000', tilak: '#000' }
+    : { badge: C.primary, gold: C.accent, cream: C.bg, steam: C.bg, tilak: C.primary };
+  const line = mono ? 'stroke="#000" stroke-width="8"' : '';
   return `
-  <circle cx="256" cy="256" r="184" fill="${mono ? '#fff' : C.accent}" ${mono ? 'stroke="#000" stroke-width="14"' : ''}/>
-  <circle cx="256" cy="256" r="166" fill="none" stroke="${mono ? '#000' : C.primaryDark}" stroke-width="7" stroke-linecap="round" stroke-dasharray="0.1 21.6"/>
-  <circle cx="256" cy="256" r="150" fill="${mono ? '#fff' : C.bg}" ${mono ? 'stroke="#000" stroke-width="6"' : ''}/>
-  ${k(172, 208, '#D97706')}${k(256, 160, C.secondary)}${k(340, 208, '#F3D27A')}
-  <circle cx="200" cy="318" r="50" fill="${mono ? '#fff' : '#E9C994'}" ${mono ? 'stroke="#000" stroke-width="8"' : 'stroke="#D4AA6A" stroke-width="3"'}/>
-  <circle cx="186" cy="305" r="6" fill="${mono ? '#000' : '#B98545'}"/><circle cx="214" cy="330" r="5" fill="${mono ? '#000' : '#B98545'}"/><circle cx="208" cy="300" r="4" fill="${mono ? '#000' : '#B98545'}"/>
-  <path d="M262 352 q50 -82 100 0 z" fill="#fff" stroke="${mono ? '#000' : '#E6D8BE'}" stroke-width="${mono ? 8 : 4}" stroke-linejoin="round"/>
-  <path d="M256 236 c-14 14 -14 30 0 38 c14 -8 14 -24 0 -38z" fill="${mono ? '#000' : C.primary}"/>`;
+  <circle cx="256" cy="256" r="240" fill="${c.badge}" ${mono ? 'stroke="#000" stroke-width="14"' : ''}/>
+  <circle cx="256" cy="256" r="222" fill="none" stroke="${c.gold}" stroke-width="6"/>
+  <circle class="logo-ring" cx="256" cy="256" r="206" fill="none" stroke="${c.gold}" stroke-width="5" stroke-linecap="round" stroke-dasharray="0.1 18" opacity="${mono ? 1 : 0.75}"/>
+  <g transform="translate(0 -22)">
+    <path class="logo-bow" pathLength="100" d="M108 286 Q256 40 404 286" fill="none" stroke="${c.gold}" stroke-width="18" stroke-linecap="round"/>
+    <path d="M108 286 q-8 14 -30 18 M404 286 q8 14 30 18" fill="none" stroke="${c.gold}" stroke-width="14" stroke-linecap="round"/>
+    <g class="logo-steam" fill="none" stroke="${c.steam}" stroke-width="10" stroke-linecap="round">
+      <path d="M206 262 c-16 -18 16 -34 0 -56"/><path d="M256 252 c-16 -20 16 -38 0 -64"/><path d="M306 262 c-16 -18 16 -34 0 -56"/>
+    </g>
+    <path d="M138 286 H374 A118 118 0 0 1 138 286 Z" fill="${c.cream}" ${line}/>
+    <rect x="126" y="276" width="260" height="22" rx="11" fill="${c.gold}"/>
+    <g fill="${c.tilak}">
+      <path d="M253 300 C244 300 237 314 235 330 C233 346 230 356 222 366 C218 372 223 379 231 376 C241 372 250 366 253 360 Z"/>
+      <path d="M 259 300 C 268 300 275 314 277 330 C 279 346 282 356 290 366 C 294 372 289 379 281 376 C 271 372 262 366 259 360 Z"/>
+    </g>
+    <path d="M241 344 q-7 6 -5 16 M271 344 q7 6 5 16" fill="none" stroke="${c.cream}" stroke-width="3" stroke-linecap="round"/>
+    <rect x="222" y="382" width="68" height="8" rx="4" fill="${c.gold}"/>
+    <rect x="212" y="398" width="88" height="16" rx="8" fill="${c.gold}"/>
+  </g>`;
 };
 
 const svg = (w, h, body, extra = '') => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${extra}${body}</svg>`;
-const icon = (x, y, size, mono) => `<g transform="translate(${x} ${y}) scale(${size / 512})">${thali(mono)}</g>`;
+const icon = (x, y, size, mono) => `<g transform="translate(${x} ${y}) scale(${size / 512})">${mark(mono)}</g>`;
 
 const files = {
   // Icon-only (transparent)
-  'logo-icon.svg': svg(512, 512, thali()),
+  'logo-icon.svg': svg(512, 512, mark()),
   // Android launcher / maskable: full-bleed saffron, thali inside the 80% safe zone
   'logo-launcher.svg': svg(512, 512, `<rect width="512" height="512" fill="${C.primary}"/>${icon(76, 76, 360)}`),
   // Rounded app icon (favicon, splash)
@@ -71,7 +87,7 @@ const files = {
     <text x="256" y="480" text-anchor="middle" font-family="Rozha One, Georgia, serif" font-size="50" fill="${C.text}">Shree Ram Bharose</text>
     <text x="256" y="530" text-anchor="middle" font-family="Hind Vadodara, sans-serif" font-weight="700" font-size="26" letter-spacing="8" fill="${C.secondary}">HINDU HOTEL</text>`, FONTS),
   // Monochrome for thermal printer / PDF (pure black & white, no text — text is printed by the printer font)
-  'logo-bill.svg': svg(512, 512, `<rect width="512" height="512" fill="#fff"/>${thali(true)}`),
+  'logo-bill.svg': svg(512, 512, `<rect width="512" height="512" fill="#fff"/>${mark(true)}`),
 };
 for (const [name, content] of Object.entries(files)) writeFileSync(resolve(out, name), content);
 console.log('SVGs written:', Object.keys(files).join(', '));
@@ -79,7 +95,7 @@ console.log('SVGs written:', Object.keys(files).join(', '));
 // ---- PNG rasterization ----
 const { createRequire } = await import('node:module');
 const { chromium } = createRequire(resolve(root, 'web/package.json'))('@playwright/test');
-const browser = await chromium.launch();
+const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH }); // CHROME_PATH: optional, any local Chrome
 const page = await browser.newPage();
 const png = async (src, size, file, w = size, h = size) => {
   await page.setViewportSize({ width: w, height: h });

@@ -337,6 +337,8 @@ export const en = {
   'printer.connecting': 'Connecting to printer…',
   'printer.printing': 'Printing…',
   'printer.disconnect': 'Disconnect',
+  'printer.change': 'Change printer',
+  'app.install': 'Install app',
   'printer.connectFirst': 'Connect the Bluetooth printer first, then print.',
   'printer.err.cancelled': 'No printer was selected',
   'printer.err.btOff': 'Bluetooth is off or not available. Turn on Bluetooth (and Location), then try again.',

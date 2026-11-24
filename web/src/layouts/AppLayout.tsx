@@ -6,10 +6,11 @@ import { useFocusMode, useOnline, usePending } from '../hooks';
 import { syncPending } from '../services/offlineQueue';
 import { getInFlight, subscribeInFlight } from '../services/api';
 import { runStation } from '../printing/station';
-import { ThaliMark } from '../components/Brand';
+import { LogoMark } from '../components/Brand';
 import { LanguagePicker } from '../components/LanguagePicker';
 import { useUi } from '../components/ui';
 import { PrinterStatus } from '../components/PrinterStatus';
+import { InstallApp } from '../components/InstallApp';
 import { Icon, type IconName } from '../components/Icon';
 import type { User } from '../types';
 
@@ -179,7 +180,7 @@ export function AppLayout() {
       {/* ===== Sidebar (tablet & desktop) ===== */}
       <aside className={`hidden md:flex fixed inset-y-0 left-0 z-30 flex-col border-r border-line bg-card transition-[width] ${expanded ? 'w-64 p-3' : 'w-20 p-2'}`}>
         <div className={`flex items-center gap-2 mb-4 min-h-14 ${expanded ? 'px-1' : 'justify-center'}`}>
-          <ThaliMark size={expanded ? 44 : 40} />
+          <LogoMark size={expanded ? 44 : 40} />
           {expanded && <div className="min-w-0"><div className="font-display text-lg leading-tight truncate">{t('app.name')}</div><div className="text-xs font-bold text-secondary uppercase">{t('app.tagline')}</div></div>}
         </div>
         <nav className="flex flex-col gap-1 overflow-y-auto">{items.map((n) => navLink(n, !expanded))}</nav>
@@ -197,10 +198,11 @@ export function AppLayout() {
             <Icon name="more" />
           </button>
           <Link to="/" className="md:hidden flex items-center gap-2 min-w-0">
-            <ThaliMark size={34} />
+            <LogoMark size={34} />
             <span className="font-display text-base leading-tight truncate max-[360px]:hidden">{t('app.name')}</span>
           </Link>
           <div className="ml-auto flex items-center gap-2">
+            <InstallApp />
             <PrinterStatus />
             <div className="hidden sm:block"><LanguagePicker compact /></div>
             <ProfileMenu onLogout={doLogout} />
@@ -245,7 +247,7 @@ export function AppLayout() {
           <div className="absolute inset-0 bg-ink/40" onClick={() => setDrawer(false)} />
           <div className="absolute inset-y-0 left-0 w-[min(20rem,85vw)] bg-card shadow-2xl flex flex-col p-3 pt-[max(0.75rem,env(safe-area-inset-top))] animate-[slide-in_.18s_ease-out]">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2 min-w-0"><ThaliMark size={40} /><div className="min-w-0"><div className="font-display leading-tight truncate">{t('app.name')}</div><div className="text-xs font-bold text-secondary uppercase">{t('app.tagline')}</div></div></div>
+              <div className="flex items-center gap-2 min-w-0"><LogoMark size={40} /><div className="min-w-0"><div className="font-display leading-tight truncate">{t('app.name')}</div><div className="text-xs font-bold text-secondary uppercase">{t('app.tagline')}</div></div></div>
               <button className="btn-ghost !min-w-11 !min-h-11 !px-0" onClick={() => setDrawer(false)} aria-label={t('common.close')}><Icon name="close" /></button>
             </div>
             <div className="flex items-center gap-3 rounded-xl bg-bg p-3 mb-3">
