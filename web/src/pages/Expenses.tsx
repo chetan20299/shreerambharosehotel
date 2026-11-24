@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n';
-import { useApi } from '../hooks';
+import { useApi, usePendingOps } from '../hooks';
 import { api } from '../services/api';
+import { removePendingOp } from '../services/offlineQueue';
 import { Filters, initialFilters } from '../components/Filters';
 import { Empty, Field, Modal, PageHeader, SkeletonList, Spinner, useUi } from '../components/ui';
 import { inr, istToday } from '../utils/format';
@@ -140,7 +141,8 @@ export default function ExpensesPage() {
   const { toast, confirm, errorText } = useUi();
   const isAdmin = user?.role === 'admin';
   const [f, setF] = useState(initialFilters('today'));
-  const { data, loading, error, reload } = useApi<{ expenses: Expense[]; total: number }>('/expenses', { from: f.from, to: f.to });
+  const { data, loading, error, reload } = useApi<{ expenses: Expense[]; total: number }>('/expenses', { from: f.from, to: f.to }, { cache: true });
+  const pendingExp = usePendingOps().filter((x) => x.userId === user?.id && x.method === 'POST' && x.path === '/expenses');
   const itemsApi = useApi<{ items: string[]; defaults: string[] }>('/expense-items', undefined, { cache: true });
   const options = useMemo(() => itemsApi.data?.items ?? [], [itemsApi.data]);
   const [picked, setPicked] = useState<string[]>([]);
@@ -210,6 +212,28 @@ export default function ExpensesPage() {
       </form>
 
       <Filters value={f} onChange={setF} times={false} />
+
+      {pendingExp.length > 0 && (
+        <section className="card p-4 border-warning bg-accent-soft/50" data-testid="pending-expenses">
+          <h2 className="font-bold mb-2">⏳ {t('exp.pending', { n: pendingExp.length })}</h2>
+          <ul className="divide-y divide-line">
+            {pendingExp.map((x) => {
+              const b = x.body as { description: string; amount: number; date: string; time: string };
+              return (
+                <li key={x.key} className="flex items-center gap-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold truncate">{b.description} <span className="chip bg-warning text-white text-xs ml-1">{t('net.pendingBadge')}</span></div>
+                    <div className="text-xs text-muted">{b.date} · {b.time}</div>
+                  </div>
+                  <b className="tabular-nums shrink-0">{inr(b.amount)}</b>
+                  <button className="btn-ghost !min-h-10 !px-3 text-error shrink-0" aria-label={t('net.discard')}
+                    onClick={async () => { if (await confirm({ title: t('net.discard'), message: `${b.description} · ${inr(b.amount)}`, danger: true, confirmText: t('net.discard') })) removePendingOp(x.key); }}>🗑️</button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {loading && !data ? <SkeletonList rows={4} /> : error ? <Empty text={errorText(error)} /> : !data?.expenses.length ? <Empty text={t('exp.none')} /> : (
         <section className="card p-4">

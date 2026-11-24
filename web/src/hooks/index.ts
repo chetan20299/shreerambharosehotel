@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { api, ApiError } from '../services/api';
-import { getPending, subscribePending } from '../services/offlineQueue';
+import { getPending, getPendingOps, subscribePending } from '../services/offlineQueue';
 
 export function useOnline() {
   return useSyncExternalStore(
@@ -16,6 +16,16 @@ export function usePending() {
     const raw = JSON.stringify(getPending());
     if (raw !== pendingRaw) { pendingRaw = raw; pendingSnapshot = JSON.parse(raw); }
     return pendingSnapshot;
+  });
+}
+
+let opsSnapshot = getPendingOps();
+let opsRaw = JSON.stringify(opsSnapshot);
+export function usePendingOps() {
+  return useSyncExternalStore(subscribePending, () => {
+    const raw = JSON.stringify(getPendingOps());
+    if (raw !== opsRaw) { opsRaw = raw; opsSnapshot = JSON.parse(raw); }
+    return opsSnapshot;
   });
 }
 
@@ -56,7 +66,8 @@ export function useApi<T>(path: string | null, query?: Record<string, string | u
     const id = opts.poll ? setInterval(() => { if (document.visibilityState === 'visible') void load(true); }, opts.poll) : undefined;
     const onOnline = () => void load(true);
     addEventListener('online', onOnline);
-    return () => { clearInterval(id); removeEventListener('online', onOnline); };
+    addEventListener('srbh:synced', onOnline);
+    return () => { clearInterval(id); removeEventListener('online', onOnline); removeEventListener('srbh:synced', onOnline); };
   }, [load, opts.poll]);
   return { data, error, loading, staleAt, reload: load, setData };
 }

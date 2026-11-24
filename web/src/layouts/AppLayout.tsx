@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties }
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n, type Key } from '../i18n';
-import { useFocusMode, useOnline, usePending } from '../hooks';
+import { useFocusMode, useOnline, usePending, usePendingOps } from '../hooks';
 import { syncPending } from '../services/offlineQueue';
 import { getInFlight, subscribeInFlight } from '../services/api';
 import { runStation } from '../printing/station';
@@ -41,7 +41,7 @@ function TopProgress() {
     return () => clearTimeout(id);
   }, [n > 0]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className={`fixed top-0 inset-x-0 z-[60] h-1 overflow-hidden transition-opacity ${show ? 'opacity-100' : 'opacity-0'}`} role="progressbar" aria-hidden={!show}>
+    <div className={`fixed top-[env(safe-area-inset-top)] inset-x-0 z-[60] h-1 overflow-hidden transition-opacity ${show ? 'opacity-100' : 'opacity-0'}`} role="progressbar" aria-hidden={!show}>
       <div className="h-full w-1/3 bg-primary animate-[progress-slide_1s_ease-in-out_infinite]" />
     </div>
   );
@@ -130,6 +130,8 @@ export function AppLayout() {
   const taskFocus = useFocusMode();
   const focusMode = loc.pathname.startsWith('/order/') || taskFocus; // order entry / layout editing use the full screen
   const mine = pending.filter((p) => p.waiterId === user?.id);
+  const myOps = usePendingOps().filter((x) => x.userId === user?.id);
+  const waiting = mine.length + myOps.length;
   const others = pending.length - mine.length;
 
   useEffect(() => runStation(!!user), [user]);
@@ -152,6 +154,8 @@ export function AppLayout() {
     reported.add(r);
     if (r.saved.length) toast(t('net.synced', { n: r.saved.length }), 'success');
     r.failed.forEach((f) => toast(t('net.syncFailed', { table: f.tableLabel, error: f.error ?? '' }), 'error'));
+    if (r.ops) toast(t('net.syncedOps', { n: r.ops }), 'success');
+    r.failedOps.forEach((f) => toast(t('net.opFailed', { error: f.error }), 'error'));
   };
   useEffect(() => {
     void sync();
@@ -159,9 +163,9 @@ export function AppLayout() {
     const timers: number[] = [];
     const onOnline = () => { void sync(); timers.push(window.setTimeout(sync, 2500), window.setTimeout(sync, 7000)); };
     addEventListener('online', onOnline);
-    const id = setInterval(() => { if (mine.length) void sync(); }, 20_000);
+    const id = setInterval(() => { if (waiting) void sync(); }, 20_000);
     return () => { removeEventListener('online', onOnline); clearInterval(id); timers.forEach(clearTimeout); };
-  }, [mine.length, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [waiting, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const doLogout = async () => { await logout(); nav('/login', { replace: true }); };
   const navLink = (n: Item, compact: boolean) => (
@@ -192,7 +196,7 @@ export function AppLayout() {
       </aside>
 
       {/* ===== Top bar (all sizes) ===== */}
-      <header className="sticky top-0 z-20 bg-bg/95 backdrop-blur border-b border-line">
+      <header className="sticky top-0 z-20 bg-bg/95 backdrop-blur border-b border-line pt-[env(safe-area-inset-top)]">
         <div className="mx-auto max-w-7xl flex items-center gap-2 px-3 sm:px-4 md:px-6 min-h-16">
           <button className="md:hidden btn-ghost !min-w-11 !min-h-11 !px-0" onClick={() => setDrawer(true)} aria-label={t('nav.openMenu')} data-testid="menu-button">
             <Icon name="more" />
@@ -209,9 +213,9 @@ export function AppLayout() {
           </div>
         </div>
         {!online && <div className="bg-warning text-white px-4 py-2 text-sm font-semibold">{t('net.offline')}</div>}
-        {mine.length > 0 && (
-          <div className="bg-accent-soft border-t border-accent px-4 py-2 text-sm font-semibold flex flex-wrap items-center justify-between gap-2">
-            <span>⏳ {t('net.pending', { n: mine.length })}</span>
+        {waiting > 0 && (
+          <div className="bg-accent-soft border-t border-accent px-4 py-2 text-sm font-semibold flex flex-wrap items-center justify-between gap-2" data-testid="sync-banner">
+            <span>⏳ {[mine.length && t('net.pending', { n: mine.length }), myOps.length && t('net.pendingOps', { n: myOps.length })].filter(Boolean).join(' · ')}</span>
             <button className="btn-ghost !min-h-9 !py-1 bg-white" onClick={sync} disabled={!online}>{t('net.syncNow')}</button>
           </div>
         )}

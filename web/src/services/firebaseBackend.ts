@@ -779,7 +779,12 @@ async function route(method: string, path: string, q: Record<string, string>, b:
     need(Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 && Math.round(amount * 100) === amount * 100, 'Enter an amount between ₹0.01 and ₹10,00,000');
     need(DATE.test(date) && date <= istToday(), 'Choose a valid date (not in the future)');
     need(TIME.test(time), 'Choose a valid time');
-    const id = newId('e');
+    // clientId: given by the offline queue so a resend after a lost reply never adds the expense twice.
+    const id = typeof b.clientId === 'string' && ID.test(b.clientId) ? b.clientId : newId('e');
+    if (b.clientId) {
+      const old = await getDoc(doc(db, 'expenses', id)).catch(() => null);
+      if (old?.exists()) return { id, ...(old.data() as object) };
+    }
     await setDoc(doc(db, 'expenses', id), { description, amount, date, time, addedBy: u.id, addedByName: u.displayName, createdAt: serverTimestamp() });
     return { id, description, amount, date, time, addedBy: u.id, addedByName: u.displayName };
   }

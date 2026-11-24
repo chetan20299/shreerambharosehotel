@@ -24,7 +24,7 @@ export function Modal({ open, onClose, title, children, footer }: {
   }, [open]);
   if (!open) return null;
   return createPortal(
-    <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-ink/40 p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-ink/40 p-0 sm:p-4 pt-[env(safe-area-inset-top)]" onClick={onClose}>
       <div role="dialog" aria-modal="true" className="card w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto rounded-b-none sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 bg-card border-b border-line px-4 py-3 flex items-start justify-between gap-3">
           <h2 className="text-lg font-bold">{title}</h2>
@@ -56,6 +56,11 @@ export function UiProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((x) => x.filter((y) => y.id !== id)), kind === 'error' ? 6000 : 3500);
   }, []);
   const confirm = useCallback((o: ConfirmOpts) => new Promise<boolean>((resolve) => { setTyped(''); setDlg({ ...o, resolve }); }), []);
+  useEffect(() => {
+    const onQueued = () => toast(t('net.queued'), 'info');
+    addEventListener('srbh:queued', onQueued);
+    return () => removeEventListener('srbh:queued', onQueued);
+  }, [t]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Server messages for 400/404/409 are specific (English); common statuses are shown translated. */
   const errorText = useCallback((e: unknown) => {
     if (e instanceof ApiError) {

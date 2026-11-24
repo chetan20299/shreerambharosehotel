@@ -42,7 +42,7 @@ export function OfflineNotice() {
 
   if (back) {
     return (
-      <div role="status" className="fixed top-3 inset-x-0 z-[80] flex justify-center px-4 pointer-events-none">
+      <div role="status" className="fixed top-[calc(0.75rem+env(safe-area-inset-top))] inset-x-0 z-[80] flex justify-center px-4 pointer-events-none">
         <div className="rounded-full bg-success text-white font-bold px-5 py-2 shadow-lg anim-fade">{t('offline.back')}</div>
       </div>
     );

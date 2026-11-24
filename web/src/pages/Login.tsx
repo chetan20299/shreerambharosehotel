@@ -39,7 +39,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-dvh grid place-items-center p-4 bg-[radial-gradient(circle_at_top,#F6E3D8,transparent_60%)]">
+    <div className="min-h-dvh grid place-items-center p-4 pt-[max(1rem,env(safe-area-inset-top))] bg-[radial-gradient(circle_at_top,#F6E3D8,transparent_60%)]">
       {busy && <Loader full label={t('loader.login')} />}
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center mb-6">

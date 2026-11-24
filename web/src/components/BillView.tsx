@@ -7,6 +7,7 @@ import { ActionOverlay, pause } from './ActionOverlay';
 import { printerErrorKey } from './PrinterStatus';
 import { connectPrinter, printBluetooth, PrinterError, restorePrinter, usePrinter } from '../printing/printer';
 import { columns, PROVISIONAL, receiptLines } from '../printing/receipt';
+import { markPendingPrinted } from '../services/offlineQueue';
 import { billPdf, shareOrDownload } from '../exports';
 import type { Order, Settings } from '../types';
 
@@ -48,7 +49,7 @@ export function BillView({ order, onPrinted }: { order: Order; onPrinted?: () =>
   const fileName = `Shree_Ram_Bharose_Hotel_Bill_${order.billNo}.pdf`;
 
   const markPrinted = async () => {
-    if (provisional) return;
+    if (provisional) { markPendingPrinted(order.id); return; } // marked on the server once the order syncs
     try { await api(`/orders/${order.id}/printed`, { method: 'POST' }); onPrinted?.(); } catch { /* offline: print still happened */ }
   };
   /** Prints on this phone's connected printer, with the printing -> done animation and a clear result. */

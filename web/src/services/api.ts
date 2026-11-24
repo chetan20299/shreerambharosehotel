@@ -1,3 +1,5 @@
+import { queueOp } from './offlineQueue';
+
 // Single gateway to the backend (Firestore + Firebase Auth via firebaseBackend.ts).
 // - in-flight counter drives the global top progress bar
 let onUnauthorized: (() => void) | undefined;
@@ -22,7 +24,7 @@ export const getInFlight = () => inFlight;
 
 type Query = Record<string, string | undefined>;
 
-export async function api<T = unknown>(path: string, opts: { method?: string; body?: unknown; query?: Query; silent?: boolean } = {}): Promise<T> {
+export async function api<T = unknown>(path: string, opts: { method?: string; body?: unknown; query?: Query; silent?: boolean; noQueue?: boolean } = {}): Promise<T> {
   // Free plan: no server. The app talks to Firestore + Firebase Auth directly (see firebaseBackend.ts).
   if (!opts.silent) bump(1);
   try {
@@ -33,6 +35,12 @@ export async function api<T = unknown>(path: string, opts: { method?: string; bo
     const err = e as { status?: number; message?: string };
     const status = err.status ?? 500;
     if (status === 401 && !path.startsWith('/auth/login') && !path.startsWith('/auth/me')) onUnauthorized?.();
+    // Offline write that is safe to send later → keep it on this phone and report success (it syncs automatically).
+    const method = opts.method ?? 'GET';
+    if (status === 0 && method !== 'GET' && !opts.noQueue && queueOp(method, path, opts.body as Record<string, unknown> | undefined)) {
+      dispatchEvent(new Event('srbh:queued'));
+      return { queued: true } as T;
+    }
     throw status === 0 ? new ApiError(0, 'offline', 'OFFLINE') : new ApiError(status, err.message ?? 'Error');
   } finally { if (!opts.silent) bump(-1); }
 }

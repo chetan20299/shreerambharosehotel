@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n';
 import { useApi, usePending } from '../hooks';
@@ -36,6 +36,13 @@ export function OrdersPage() {
   const { data, loading, error, reload } = useApi<{ orders: Order[]; summary: Summary }>('/orders', filterQuery(f));
   const pending = usePending().filter((p) => p.waiterId === user?.id || isAdmin);
   const [provisional, setProvisional] = useState<Order | null>(null);
+  const [params, setParams] = useSearchParams();
+  const printKey = params.get('print');
+  useEffect(() => { // just saved offline → show its bill so the waiter can print it straight away
+    const p = printKey && pending.find((x) => x.idempotencyKey === printKey);
+    if (p) setProvisional(pendingAsOrder(p));
+    if (printKey) setParams({}, { replace: true });
+  }, [printKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');

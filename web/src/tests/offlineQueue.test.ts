@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { addPending, getPending, syncPending, type PendingOrder } from '../services/offlineQueue';
+import { addPending, getPending, getPendingOps, syncPending, type PendingOrder } from '../services/offlineQueue';
 import { handle } from '../services/firebaseBackend';
 
 // The backend is Firestore (firebaseBackend.handle); fake it here.
@@ -49,5 +49,41 @@ describe('offline queue sync', () => {
     addPending(p('a'));
     await Promise.all([syncPending('w1'), syncPending('w1')]);
     expect(backend).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('offline changes (generic queue)', () => {
+  const offline = () => Object.assign(new Error('offline'), { status: 0 });
+  beforeEach(() => {
+    localStorage.clear(); backend.mockReset();
+    localStorage.setItem('srbh.session', JSON.stringify({ user: { id: 'w1' }, csrf: '' }));
+  });
+
+  it('queues safe writes when offline, refuses the rest, and syncs them in order once online', async () => {
+    const { api, ApiError } = await import('../services/api');
+    backend.mockRejectedValue(offline());
+    expect(await api('/expenses', { method: 'POST', body: { description: 'Milk', amount: 50 } })).toEqual({ queued: true });
+    expect(await api('/expenses/e1', { method: 'DELETE' })).toEqual({ queued: true });
+    await expect(api('/orders/delete', { method: 'POST', body: {} })).rejects.toBeInstanceOf(ApiError); // needs internet
+    await expect(api('/users/u1', { method: 'PATCH', body: { password: 'secret123' } })).rejects.toBeInstanceOf(ApiError); // never stored
+    const ops = getPendingOps();
+    expect(ops.map((o) => o.path)).toEqual(['/expenses', '/expenses/e1']);
+    expect(ops[0]!.body).toMatchObject({ clientId: ops[0]!.key }); // resend-safe id
+
+    backend.mockReset();
+    backend.mockResolvedValueOnce({ id: 'x' }).mockRejectedValueOnce(Object.assign(new Error('gone'), { status: 404 }));
+    const r = await syncPending('w1');
+    expect(r.ops).toBe(1); // the DELETE was already done on the server: dropped silently
+    expect(r.failedOps).toHaveLength(0);
+    expect(getPendingOps()).toHaveLength(0);
+  });
+
+  it('keeps changes queued while still offline', async () => {
+    const { api } = await import('../services/api');
+    backend.mockRejectedValue(offline());
+    await api('/settings', { method: 'PUT', body: { footer: 'x' } });
+    const r = await syncPending('w1');
+    expect(r.ops).toBe(0);
+    expect(getPendingOps()).toHaveLength(1);
   });
 });

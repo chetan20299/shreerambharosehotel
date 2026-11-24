@@ -92,7 +92,7 @@ export function OrderEntryPage() {
       if (e instanceof ApiError && e.status === 0 && !addTo) {
         addPending({ idempotencyKey: idem.current, waiterId: user!.id, waiterName: user!.displayName, tableId: '', tableLabel: '', createdAt: new Date().toISOString(), items: lines, total });
         toast(t('order.savedOffline'), 'info');
-        finish('/orders');
+        finish(`/orders?print=${idem.current}`);
       } else { toast(errorText(e), 'error'); setReview(false); }
     } finally { setSaving(false); }
   };
