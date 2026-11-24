@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { useApi } from '../hooks';
 import { api } from '../services/api';
@@ -6,7 +6,7 @@ import { Modal, Spinner, useUi } from './ui';
 import { ActionOverlay, pause } from './ActionOverlay';
 import { printerErrorKey } from './PrinterStatus';
 import { connectPrinter, printBluetooth, PrinterError, restorePrinter, usePrinter } from '../printing/printer';
-import { PROVISIONAL, receiptLines } from '../printing/receipt';
+import { columns, PROVISIONAL, receiptLines } from '../printing/receipt';
 import { billPdf, shareOrDownload } from '../exports';
 import type { Order, Settings } from '../types';
 
@@ -29,6 +29,22 @@ export function BillView({ order, onPrinted }: { order: Order; onPrinted?: () =>
   const nowHHMM = () => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
   const provisional = order.billNo === PROVISIONAL;
   const lines = receiptLines(order, s);
+  const cols = columns(s.paperWidth);
+  // Thermal printers print exactly `cols` characters across the printable width (58mm: 48mm, 80mm: 72mm).
+  // Size the monospace font so one full line fills the preview's text area exactly → nothing is ever cut.
+  const preRef = useRef<HTMLPreElement>(null);
+  useLayoutEffect(() => {
+    const pre = preRef.current;
+    if (!pre) return;
+    const ctx = document.createElement('canvas').getContext('2d')!;
+    ctx.font = `100px ${getComputedStyle(pre).fontFamily}`;
+    const charPerPx = ctx.measureText('0'.repeat(cols)).width / 100;
+    const fit = () => { if (pre.clientWidth) pre.style.fontSize = `${(pre.clientWidth / charPerPx) * 0.995}px`; };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(pre);
+    return () => ro.disconnect();
+  }, [cols]);
   const fileName = `Shree_Ram_Bharose_Hotel_Bill_${order.billNo}.pdf`;
 
   const markPrinted = async () => {
@@ -146,13 +162,14 @@ export function BillView({ order, onPrinted }: { order: Order; onPrinted?: () =>
       </Modal>
       <ActionOverlay kind={printedMsg ? 'done' : busy === 'print' ? 'printing' : null} label={printedMsg || t('anim.printing')} />
       {/* Receipt preview — this element is also what Android print outputs. */}
-      <div id="print-area" className={`relative order-1 md:order-2 mx-auto bg-white shadow-md border px-3 py-4 ${result?.kind === 'printed' ? 'border-success ring-2 ring-success/40' : 'border-line'}`} style={{ width: s.paperWidth === 80 ? '80mm' : '58mm', maxWidth: '100%' }} lang="en">
+      <div id="print-area" className={`relative order-1 md:order-2 mx-auto bg-white shadow-md border py-4 ${result?.kind === 'printed' ? 'border-success ring-2 ring-success/40' : 'border-line'}`} style={{ width: s.paperWidth === 80 ? '80mm' : '58mm', maxWidth: '100%', paddingInline: s.paperWidth === 80 ? '4mm' : '5mm' }} lang="en">
         {(result?.kind === 'printed' || (order.printCount ?? 0) > 0) && (
           <span className="print-stamp absolute top-3 right-2 rounded-md border-2 border-success text-success font-black text-xs tracking-widest px-2 py-0.5 bg-white/90" data-testid="printed-stamp">
             {t('bill.stampPrinted')}</span>
         )}
-        <img src="/brand/logo-bill.png" alt="" className="mx-auto mb-2 w-16 h-16" />
-        <pre className="font-mono whitespace-pre text-[10px] leading-[1.35] overflow-hidden text-black">
+        {/* Same share of the printable width as the printed logo (144 of 384 dots / 192 of 576 dots). */}
+        <img src="/brand/logo-bill.png" alt="" className="mx-auto mb-2 aspect-square" style={{ width: s.paperWidth === 80 ? '33.3%' : '37.5%' }} />
+        <pre ref={preRef} className="font-mono whitespace-pre text-[10px] leading-[1.45] overflow-hidden text-black">
           {lines.map((l, i) => <div key={i} className={l.bold ? 'font-bold' : ''} style={{ textAlign: l.align === 'center' ? 'center' : 'left' }}>{l.text || ' '}</div>)}
         </pre>
       </div>

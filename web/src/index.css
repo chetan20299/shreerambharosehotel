@@ -59,6 +59,12 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 @utility th { @apply text-left text-xs font-bold uppercase tracking-wide text-muted px-3 py-2 bg-bg; }
 @utility td { @apply px-3 py-2 border-t border-line; }
 
+/* Date/time inputs: value centered (Android/iOS/desktop Chrome render it top-left by default). */
+.input-dt { -webkit-appearance: none; appearance: none; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; line-height: normal; position: relative; }
+.input-dt::-webkit-date-and-time-value { text-align: center; margin: 0; }
+.input-dt::-webkit-datetime-edit { display: flex; justify-content: center; align-items: center; height: 100%; padding: 0; }
+.input-dt::-webkit-calendar-picker-indicator { position: absolute; right: .75rem; opacity: .7; cursor: pointer; }
+
 /* Letter-spacing breaks Gujarati/Devanagari conjuncts & matras: always 0 for Indic UI text. */
 :lang(gu) *, :lang(hi) * { letter-spacing: 0 !important; }
 
@@ -79,8 +85,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 @media print {
   body * { visibility: hidden; }
   #print-area, #print-area * { visibility: visible; }
-  #print-area { position: absolute; inset: 0 auto auto 0; width: 100%; }
-  @page { margin: 4mm; }
+  /* Keep the paper width + side margins from the preview so the print matches it exactly. */
+  #print-area { position: absolute; inset: 0 auto auto 0; max-width: none !important; border: 0; box-shadow: none; }
+  @page { margin: 0; }
 }
 
 /* Action overlay animations (ActionOverlay.tsx) */

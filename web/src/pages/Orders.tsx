@@ -46,14 +46,22 @@ export function OrdersPage() {
     if (await confirm({ title: t('net.discard'), message: t('net.discardConfirm', { table: p.tableLabel }), danger: true, confirmText: t('net.discard') })) removePending(p.idempotencyKey);
   };
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const allShown = shown.length > 0 && shown.every((o) => selected.has(o.id));
+  const toggleAll = () => setSelected(allShown ? new Set() : new Set(shown.map((o) => o.id)));
   const deleteSelected = async () => {
-    const ids = [...selected];
+    // The server takes up to 500 ids per request.
+    const chunks: string[][] = [];
+    for (const id of selected) { if (!chunks.length || chunks.at(-1)!.length === 500) chunks.push([]); chunks.at(-1)!.push(id); }
+    const send = (ids: string[], dryRun: boolean) => api<{ count: number; total?: number; backupPath?: string }>('/orders/delete',
+      { method: 'POST', body: { mode: 'ids', ids, dryRun, ...(dryRun ? {} : { confirm: 'DELETE' }) } });
     try {
-      const dry = await api<{ count: number; total: number }>('/orders/delete', { method: 'POST', body: { mode: 'ids', ids, dryRun: true } });
-      const ok = await confirm({ title: t('orders.deleteSelected', { n: dry.count }), message: t('settings.affected', { n: dry.count, amount: inr(dry.total) }), danger: true, confirmText: t('common.delete'), requireText: 'DELETE' });
+      const dry = await Promise.all(chunks.map((c) => send(c, true)));
+      const count = dry.reduce((s, d) => s + d.count, 0), total = dry.reduce((s, d) => s + (d.total ?? 0), 0);
+      const ok = await confirm({ title: t('orders.deleteSelected', { n: count }), message: t('settings.affected', { n: count, amount: inr(total) }), danger: true, confirmText: t('common.delete'), requireText: 'DELETE' });
       if (!ok) return;
-      const r = await api<{ count: number; backupPath: string }>('/orders/delete', { method: 'POST', body: { mode: 'ids', ids, dryRun: false, confirm: 'DELETE' } });
-      toast(t('settings.deleted', { n: r.count, path: r.backupPath }), 'success');
+      let n = 0, path = '';
+      for (const c of chunks) { const r = await send(c, false); n += r.count; path = r.backupPath ?? path; }
+      toast(t('settings.deleted', { n, path }), 'success');
       setSelected(new Set()); void reload();
     } catch (e) { toast(errorText(e), 'error'); }
   };
@@ -92,6 +100,14 @@ export function OrdersPage() {
 
       {loading && !data ? <SkeletonList rows={5} /> : error ? <Empty text={errorText(error)} /> : !data?.orders.length ? <Empty text={t('orders.none')} /> : !shown.length ? <Empty text={t('search.none', { q })} /> : (
         <>
+          {isAdmin && (
+            <label className="card px-3 py-2 mb-2 flex items-center gap-3 font-semibold cursor-pointer select-none" data-testid="orders-select-all">
+              <input type="checkbox" className="h-5 w-5 accent-primary" checked={allShown} onChange={toggleAll}
+                ref={(el) => { if (el) el.indeterminate = selected.size > 0 && !allShown; }} />
+              <span>{t('orders.selectAll', { n: shown.length })}</span>
+              {selected.size > 0 && <button type="button" className="ml-auto text-sm text-primary" onClick={(e) => { e.preventDefault(); setSelected(new Set()); }}>{t('orders.clearSel')}</button>}
+            </label>
+          )}
           <div className="mb-3 text-sm font-semibold text-muted">{t('common.orders')}: {data.summary.orderCount} · {t('common.total')}: <span className="text-ink">{inr(data.summary.totalAmount)}</span></div>
           <div className="grid gap-2">
             {shown.map((o) => (

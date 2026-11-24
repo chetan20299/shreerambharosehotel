@@ -199,10 +199,10 @@ export default function ExpensesPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1" data-testid="expense-when">
           <Field label={`📅 ${t('common.date')}`}>
-            <input type="date" className="input w-full min-w-0" max={istToday()} value={when.date} onChange={(e) => setWhen({ ...when, date: e.target.value })} data-testid="expense-date" />
+            <input type="date" className="input input-dt w-full min-w-0" max={istToday()} value={when.date} onChange={(e) => setWhen({ ...when, date: e.target.value })} data-testid="expense-date" />
           </Field>
           <Field label={`🕒 ${t('common.time')}`}>
-            <input type="time" className="input w-full min-w-0" value={when.time} onChange={(e) => setWhen({ ...when, time: e.target.value })} data-testid="expense-time" />
+            <input type="time" className="input input-dt w-full min-w-0" value={when.time} onChange={(e) => setWhen({ ...when, time: e.target.value })} data-testid="expense-time" />
           </Field>
         </div>
         <button className="btn-primary w-full sm:w-auto" disabled={!valid || saving} data-testid="expense-save">

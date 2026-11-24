@@ -1,5 +1,5 @@
 import type { Expense, Order, Settings, Summary } from '../types';
-import { ascii, receiptLines } from '../printing/receipt';
+import { ascii, columns, receiptLines } from '../printing/receipt';
 
 // All exported files are English-only, regardless of the UI language.
 export const HOTEL = 'Shree Ram Bharose Hindu Hotel';
@@ -107,8 +107,10 @@ export async function billPdf(order: Order, settings: Settings) {
   const { jsPDF } = await import('jspdf');
   const lines = receiptLines(order, settings);
   const width = settings.paperWidth === 80 ? 80 : 58;
-  const fs = settings.paperWidth === 80 ? 8.5 : 7.2;
-  const lh = fs * 0.42;
+  const printable = settings.paperWidth === 80 ? 72 : 48; // mm the printer prints on
+  const margin = (width - printable) / 2;
+  const fs = printable / columns(settings.paperWidth) / 0.6 / 0.3528; // pt: one full line = printable width
+  const lh = fs * 0.5;
   const doc = new jsPDF({ unit: 'mm', format: [width, 34 + lines.length * lh + 10] });
   const logo = await pngDataUrl('/brand/logo-bill.png').catch(() => null);
   if (logo) doc.addImage(logo, 'PNG', width / 2 - 12, 4, 24, 24);
@@ -116,7 +118,7 @@ export async function billPdf(order: Order, settings: Settings) {
   let y = 34;
   for (const l of lines) {
     doc.setFont('courier', l.bold ? 'bold' : 'normal').setFontSize(fs);
-    doc.text(l.text, l.align === 'center' ? width / 2 : 3, y, { align: l.align === 'center' ? 'center' : 'left' });
+    doc.text(l.text, l.align === 'center' ? width / 2 : margin, y, { align: l.align === 'center' ? 'center' : 'left' });
     y += lh;
   }
   return doc.output('blob');
