@@ -8,7 +8,9 @@
     <meta name="theme-color" content="#B4441B" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- "default": iOS reserves the status-bar strip itself (tinted by theme-color), so nothing shows through it.
+         "black-translucent" drew the page under the clock/notch and left a coloured strip on some iPhones. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Ram Bharose" />
     <meta name="application-name" content="Ram Bharose" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
